@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Default" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Guid>f02d5b22-6057-40de-ab55-2badb89e8f8a</Guid>
+    <Name>RequestEvac</Name>
+    <Description>This mod could have been renamed Firebrand Choice. The ability to place the evac zone has been modified. You will now request an evac. Then Firebrand will place the evac zone when she is ready.
+tags= War of the Chosen, Gameplay, Firebrand</Description>
+    <SteamPublishID>0</SteamPublishID>
+    <AssemblyName>RequestEvac</AssemblyName>
+    <RootNamespace>RequestEvac</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Folder Include="Config\" />
+    <Folder Include="Localization\" />
+    <Folder Include="Content" />
+    <Folder Include="Src\" />
+    <Folder Include="Src\RequestEvac\" />
+    <Folder Include="Src\RequestEvac\Classes\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Config\XComRequestEvac.ini">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Content\DelayedEvac_Assets.upk">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="ReadMe.txt" />
+    <Content Include="ModPreview.jpg" />
+    <Content Include="Config\XComEditor.ini" />
+    <Content Include="Config\XComEngine.ini" />
+    <Content Include="Config\XComGame.ini" />
+    <Content Include="Localization\XComGame.int" />
+    <Content Include="Src\RequestEvac\Classes\Ability_RequestEvac.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\RequestEvac\Classes\Action_RequestEvac.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\RequestEvac\Classes\X2DownloadableContentInfo_RequestEvac.uc" />
+    <Content Include="Src\RequestEvac\Classes\GameState_RequestEvac.uc">
+      <SubType>Content</SubType>
+    </Content>
+  </ItemGroup>
+  <Import Project="$(MSBuildLocalExtensionPath)\XCOM2.targets" />
+</Project>
