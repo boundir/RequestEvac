@@ -14,6 +14,7 @@ function Init()
 {
 	super.Init();
 
+	`log("DEBUG : Action_RequestEvac", , 'RequestEvac');
 	AbilityContext = XComGameStateContext_Ability(StateChangeContext);
 	if (AbilityContext != None)
 	{
@@ -26,8 +27,6 @@ simulated state Executing
 
 Begin:
 
-	// MissionAbortRequest is the same as EVACRequest.  However, there are way more VO lines 
-	// associated with EVACrequest, so we skew the selection accordingly.  mdomowicz 2015_07_27
 	if (`SYNC_RAND(100)<10)
 	{
 		UnitWhoRequestedEvac.UnitSpeak('MissionAbortRequest');

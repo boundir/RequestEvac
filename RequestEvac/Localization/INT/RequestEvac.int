@@ -1,0 +1,6 @@
+[UIScreenListener_RequestEvac]
+strEvacRequestTitle="EVAC Requested"
+strEvacRequestSubtitle="Turns until Skyranger arrives"
+
+strRemoveEvacTitle="EVAC Arrived"
+strRemoveEvacSubtitle="Turns until Skyranger leaves"

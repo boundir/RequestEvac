@@ -3,15 +3,15 @@ class Ability_RequestEvac extends X2Ability config(RequestEvac);
 
 var config int ActionCost; // in tiles
 var config int GlobalCooldown; // in tiles
-var config bool FreeAction; // in tiles
-var config bool ShouldBreakConcealment; // in tiles
+var config int DistanceFromXComSquad;
+var config bool EvacInLOS;
+var config bool FreeAction;
+var config bool ShouldBreakConcealment;
 
-var const config float BiasConeAngleInDegrees;
-// if specified, will use SpawnLocation as a centerpoint around which a spawn within these bounds
-// will be spawned
-var config int MinimumTilesFromLocation; // in tiles
-var config int MaximumTilesFromLocation; // in tiles
-var config bool BiasAwayFromXComSpawn; // if true, will attempt to pick an evac location further away from the xcom spawn
+var config bool RandomizeEvacTurns;
+var config int TurnsBeforeEvac;
+var config int MinimumTurnBeforeEvac;
+var config int MaximumTurnsBeforeEvac;
 
 static function array<X2DataTemplate> CreateTemplates()
 {
@@ -62,7 +62,7 @@ static function X2AbilityTemplate RequestEvac()
 	Template.AbilityCooldown = Cooldown;
 
 	Template.BuildNewGameStateFn = RequestEvac_BuildGameState;
-	Template.BuildVisualizationFn = RequestEvac_BuildVisualization;
+	Template.BuildVisualizationFn = TypicalAbility_BuildVisualization;
 
 	Template.bDontDisplayInAbilitySummary = true;
 
@@ -78,7 +78,8 @@ simulated function XComGameState RequestEvac_BuildGameState( XComGameStateContex
 	local X2AbilityTemplate AbilityTemplate;
 	local XComGameStateHistory History;
 
-	local Vector ActualSpawnLocation; // actually used spawn location, out parameter
+	local int Delay;
+	local Vector EvacLocation; // actually used spawn location, out parameter
 
 	History = `XCOMHISTORY;
 	//Build the new game state frame
@@ -88,13 +89,15 @@ simulated function XComGameState RequestEvac_BuildGameState( XComGameStateContex
 	AbilityState = XComGameState_Ability(History.GetGameStateForObjectID(AbilityContext.InputContext.AbilityRef.ObjectID, eReturnType_Reference));	
 	AbilityTemplate = AbilityState.GetMyTemplate();
 
-	ActualSpawnLocation = GetSpawnLocation();
+	// Use of AIReinforcementSpawner methods
+	EvacLocation = GetEvacLocation();
 
 	UnitState = XComGameState_Unit(NewGameState.ModifyStateObject(class'XComGameState_Unit', AbilityContext.InputContext.SourceObject.ObjectID));
 	//Apply the cost of the ability
 	AbilityTemplate.ApplyCost(AbilityContext, AbilityState, UnitState, none, NewGameState);
 
-	class'GameState_RequestEvac'.static.RequestEvac(NewGameState, ActualSpawnLocation, UnitState.GetTeam());
+	Delay = GetEvacDelay();
+	class'GameState_RequestEvac'.static.InitiateEvacZoneDeployment(Delay, EvacLocation, NewGameState);
 
 	//Return the game state we have created
 	return NewGameState;	
@@ -110,106 +113,78 @@ simulated function RequestEvac_BuildVisualization(XComGameState VisualizeGameSta
 	}
 	`assert(EvacState != none);
 
-	EvacState.BuildVisualizationForSpawnerCreation(VisualizeGameState);
+	EvacState.SoldierRequestEvac(VisualizeGameState);
 }
 
-
-private function Vector GetSpawnLocation()
+function int GetEvacDelay()
 {
-	local XComWorldData WorldData;
-	local XComGroupSpawn Spawn;
-	local XComParcelManager ParcelManager;
-	local XComTacticalMissionManager MissionManager;
-	local Vector ObjectiveLocation;
-	local float TilesFromSpawn;
-	local array<XComGroupSpawn> SpawnsInRange;
-	local vector SoldierSpawnToObjectiveNormal;
-	local float BiasHalfAngleDot;
-	local float SpawnDot;
-	local TTile SpawnTile;
+	local int Idx, Delay;
+	local array<int> EvacNumbers;
 
+	if(default.RandomizeEvacTurns)
+	{
+		for(Idx = default.MinimumTurnBeforeEvac; Idx <= default.MaximumTurnsBeforeEvac; Idx++)
+		{
+			EvacNumbers.AddItem(Idx);
+		}
+		Delay = EvacNumbers[Rand(EvacNumbers.Length)];
+	}
+	else
+	{
+		Delay = default.TurnsBeforeEvac;
+	}
+
+	return Delay;
+}
+
+public function Vector GetEvacLocation()
+{
+	local int IdealSpawnTilesOffset, SearchAttempts;
 	local XComAISpawnManager SpawnManager;
-	local vector XCOMLocation;
+	local vector XCOMLocation, EvacLocation;
+	local TTile SpawnTile;
+	local bool LocationFound;
+	local XComWorldData WorldData;
 
-	SpawnManager = `SPAWNMGR;
-	XCOMLocation = SpawnManager.GetCurrentXComLocation();
-
-	// `LOG("DEBUG : MinimumTilesFromLocation:" @ default.MinimumTilesFromLocation, , 'RequestEvac');
-	// `LOG("DEBUG : MaximumTilesFromLocation:" @ default.MaximumTilesFromLocation, , 'RequestEvac');
-
-	if(default.MinimumTilesFromLocation < 0 && default.MaximumTilesFromLocation < 0)
-	{
-		// simple case, this isn't a ranged check and we just want to use the exact location
-		return XCOMLocation;
-	}
-
-	if(default.MinimumTilesFromLocation >= default.MaximumTilesFromLocation)
-	{
-		`Redscreen("SeqAct_SpawnEvacZone: The minimum zone distance is further than the maximum, this makes no sense!");
-		return XCOMLocation;
-	}
-
-	// find all group spawns that lie within the the specified limits
 	WorldData = `XWORLD;
-	foreach `BATTLE.AllActors(class'XComGroupSpawn', Spawn)
+	SpawnManager = `SPAWNMGR;
+	
+	XCOMLocation = SpawnManager.GetCurrentXComLocation();
+	LocationFound = false;
+	SearchAttempts = 0;
+	
+	while(!LocationFound)
 	{
-		TilesFromSpawn = VSize(Spawn.Location - XCOMLocation) / class'XComWorldData'.const.WORLD_StepSize;
-		// TilesFromSpawn = VSize(ParcelManager.SoldierSpawn.Location) / class'XComWorldData'.const.WORLD_StepSize;
-		// `LOG("DEBUG : TilesFromSpawn:" @ TilesFromSpawn, , 'RequestEvac');
+		IdealSpawnTilesOffset = `SYNC_RAND(default.DistanceFromXComSquad);
+		`LOG("Searching Valid Evac Location:" @ IdealSpawnTilesOffset, , 'RequestEvac');
 
-		// Too close
-		if (TilesFromSpawn < default.MinimumTilesFromLocation)
-			continue;
+		if(SearchAttempts > 10)
+		{
+			// We didn't find a valid location with 10 attempts. We will search a valid location on the map.
+			IdealSpawnTilesOffset = `SYNC_RAND(50);
+			EvacLocation = SpawnManager.SelectReinforcementsLocation(none, XCOMLocation, IdealSpawnTilesOffset, false, false, false, true);
+		}
+		else
+		{
+			EvacLocation = SpawnManager.SelectReinforcementsLocation(none, XCOMLocation, IdealSpawnTilesOffset, default.EvacInLOS, false, false, true);
+		}
 
-		// Too far
-		if (TilesFromSpawn > default.MaximumTilesFromLocation)
-			continue;
+		SearchAttempts++;
 
-		// not within the game board
-		if (!WorldData.Volume.EncompassesPoint(Spawn.Location))
+		if (!WorldData.Volume.EncompassesPoint(EvacLocation))
+		{
 			continue;
+		}
 
 		// validate the actual location (in case floor tiles have been destroyed)
-		SpawnTile = `XWORLD.GetTileCoordinatesFromPosition( Spawn.Location );
+		SpawnTile = `XWORLD.GetTileCoordinatesFromPosition( EvacLocation );
+
 		if (!class'X2TargetingMethod_EvacZone'.static.ValidateEvacArea( SpawnTile, false ))
-			continue;
-
-		SpawnsInRange.AddItem(Spawn);
-	}
-
-	if(SpawnsInRange.Length == 0)
-	{
-		// couldn't find any spawns in range!
-		`Redscreen("SeqAct_SpawnEvacZone: Couldn't find any spawns in range, spawning at the centerpoint!");
-		return XCOMLocation;
-	}
-	// `LOG("DEBUG : SpawnsInRange" @ SpawnsInRange.Length, , 'RequestEvac');
-	// now pick a spawn.
-	if(default.BiasAwayFromXComSpawn)
-	{
-		// `LOG("DEBUG : PICK A SPAWN", , 'RequestEvac');
-		ParcelManager = `PARCELMGR;
-		MissionManager = `TACTICALMISSIONMGR;
-		if(MissionManager.GetLineOfPlayEndpoint(ObjectiveLocation))
 		{
-			// randomize the array so we can just take the first one that is on the opposite side of the objectives
-			// from the xcom spawn
-			SpawnsInRange.RandomizeOrder();
-
-			SoldierSpawnToObjectiveNormal = Normal(ParcelManager.SoldierSpawn.Location - ObjectiveLocation);
-			BiasHalfAngleDot = cos((180.0f - (BiasConeAngleInDegrees * 0.5)) * DegToRad); // negated since it's on the opposite side of the spawn
-			foreach SpawnsInRange(Spawn)
-			{
-				SpawnDot = SoldierSpawnToObjectiveNormal dot Normal(Spawn.Location - ObjectiveLocation);
-				if(SpawnDot < BiasHalfAngleDot)
-				{
-					return Spawn.Location;
-				}
-			}
+			continue;
 		}
+		LocationFound = true;
 	}
 
-	// random pick
-	// `LOG("DEBUG : RANDOM PICK", , 'RequestEvac');
-	return SpawnsInRange[`SYNC_RAND(SpawnsInRange.Length)].Location;
+	return EvacLocation;
 }
