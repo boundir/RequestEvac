@@ -14,7 +14,7 @@ function Init()
 {
 	super.Init();
 
-	`log("DEBUG : Action_RequestEvac", , 'RequestEvac');
+	// `log("DEBUG : Action_RequestEvac", , 'RequestEvac');
 	AbilityContext = XComGameStateContext_Ability(StateChangeContext);
 	if (AbilityContext != None)
 	{

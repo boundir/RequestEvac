@@ -43,7 +43,7 @@ function UpdateEvacTimer(bool DecrementCounter)
 		return;
 	}
 
-	`log("DEBUG : UpdateEvacTimer", , 'RequestEvac');
+	// `log("DEBUG : UpdateEvacTimer", , 'RequestEvac');
 
 	// Update the UI
 	if (EvacState.GetCountdown() > 0)
@@ -76,13 +76,13 @@ function EventListenerReturn OnTurnBegun(Object EventData, Object EventSource, X
 	local XComGameState NewGameState;
 	local bool NeedsUpdate;
 
-	`log("DEBUG : OnTurnBegun", , 'RequestEvac');
+	// `log("DEBUG : OnTurnBegun", , 'RequestEvac');
 	
 	History = `XCOMHISTORY;
 	EvacState = GameState_RequestEvac(History.GetSingleGameStateObjectForClass(class'GameState_RequestEvac', true));
 
-	`log("DEBUG : OnTurnBegun GetCountdown" @ EvacState.GetCountdown(), , 'RequestEvac');
-	`log("DEBUG : OnTurnBegun GetRemoveEvacCountdown" @ EvacState.GetRemoveEvacCountdown(), , 'RequestEvac');
+	// `log("DEBUG : OnTurnBegun GetCountdown" @ EvacState.GetCountdown(), , 'RequestEvac');
+	// `log("DEBUG : OnTurnBegun GetRemoveEvacCountdown" @ EvacState.GetRemoveEvacCountdown(), , 'RequestEvac');
 
 	Player = XComGameState_Player(EventData);
 	NeedsUpdate = Player != none && Player.GetTeam() == eTeam_XCom;
@@ -131,7 +131,7 @@ function EventListenerReturn OnTileDataChanged(Object EventData, Object EventSou
 	local XComGameState NewGameState;
 	local TTile CenterTile;
 
-	`log("DEBUG : OnTileDataChanged", , 'RequestEvac');
+	// `log("DEBUG : OnTileDataChanged", , 'RequestEvac');
 
 	History = `XCOMHISTORY;
 	EvacState = GameState_RequestEvac(History.GetSingleGameStateObjectForClass(class'GameState_RequestEvac', true));

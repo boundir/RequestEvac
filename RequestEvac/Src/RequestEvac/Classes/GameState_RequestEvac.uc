@@ -71,7 +71,7 @@ function BuildVisualizationForSpawnerCreation(XComGameState VisualizeGameState)
 	local X2Action_PlayEffect EvacSpawnerEffectAction;
 	local X2Action_PlayNarrative NarrativeAction;
 
-	`log("DEBUG : BuildVisualizationForSpawnerCreation", , 'RequestEvac');
+	// `log("DEBUG : BuildVisualizationForSpawnerCreation", , 'RequestEvac');
 
 	History = `XCOMHISTORY;
 	EvacSpawnerState = GameState_RequestEvac(History.GetGameStateForObjectID(ObjectID));
@@ -287,7 +287,7 @@ function AppendAdditionalSyncActions(out VisualizationActionMetadata ActionMetad
 
 function InitRemoveEvacCountdown()
 {
-	`log("DEBUG : InitRemoveEvacCountdown" @ default.TurnsBeforeEvacExpires, , 'RequestEvac');
+	// `log("DEBUG : InitRemoveEvacCountdown" @ default.TurnsBeforeEvacExpires, , 'RequestEvac');
 	RemoveEvacCountdown = default.TurnsBeforeEvacExpires;
 }
 
