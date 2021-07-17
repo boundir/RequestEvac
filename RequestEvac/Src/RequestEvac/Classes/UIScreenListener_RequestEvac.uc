@@ -30,12 +30,12 @@ event OnInit(UIScreen Screen)
 // Update/refresh the evac timer.
 function UpdateEvacTimer(bool DecrementCounter)
 {
-	local GameState_RequestEvac EvacState;
+	local XComGameState_RequestEvac EvacState;
 	local XComGameStateHistory History;
 	local UISpecialMissionHUD SpecialMissionHUD;
 
 	History = `XCOMHISTORY;
-	EvacState = GameState_RequestEvac(History.GetSingleGameStateObjectForClass(class'GameState_RequestEvac', true));
+	EvacState = XComGameState_RequestEvac(History.GetSingleGameStateObjectForClass(class'XComGameState_RequestEvac', true));
 	SpecialMissionHUD = `PRES.GetSpecialMissionHUD();
 
 	if (EvacState == none)
@@ -71,7 +71,7 @@ function UpdateEvacTimer(bool DecrementCounter)
 function EventListenerReturn OnTurnBegun(Object EventData, Object EventSource, XComGameState GameState, Name EventID, Object CallbackData)
 {
 	local XComGameState_Player Player;
-	local GameState_RequestEvac EvacState;
+	local XComGameState_RequestEvac EvacState;
 	local XComGameStateHistory History;
 	local XComGameState NewGameState;
 	local bool NeedsUpdate;
@@ -79,7 +79,7 @@ function EventListenerReturn OnTurnBegun(Object EventData, Object EventSource, X
 	// `log("DEBUG : OnTurnBegun", , 'RequestEvac');
 	
 	History = `XCOMHISTORY;
-	EvacState = GameState_RequestEvac(History.GetSingleGameStateObjectForClass(class'GameState_RequestEvac', true));
+	EvacState = XComGameState_RequestEvac(History.GetSingleGameStateObjectForClass(class'XComGameState_RequestEvac', true));
 
 	// `log("DEBUG : OnTurnBegun GetCountdown" @ EvacState.GetCountdown(), , 'RequestEvac');
 	// `log("DEBUG : OnTurnBegun GetRemoveEvacCountdown" @ EvacState.GetRemoveEvacCountdown(), , 'RequestEvac');
@@ -91,7 +91,7 @@ function EventListenerReturn OnTurnBegun(Object EventData, Object EventSource, X
 	{
 		// Decrement the counter if necessary
 		NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("UpdateRemoveEvacCountdown");
-		EvacState = GameState_RequestEvac(NewGameState.CreateStateObject(class'GameState_RequestEvac', EvacState.ObjectID));
+		EvacState = XComGameState_RequestEvac(NewGameState.CreateStateObject(class'XComGameState_RequestEvac', EvacState.ObjectID));
 		EvacState.SetRemoveEvacCountdown(EvacState.GetRemoveEvacCountdown() - 1);
 		NewGameState.AddStateObject(EvacState);
 		`TACTICALRULES.SubmitGameState(NewGameState);
@@ -99,7 +99,7 @@ function EventListenerReturn OnTurnBegun(Object EventData, Object EventSource, X
 		// We've hit zero: time to delete the evac zone!
 		if (EvacState.GetRemoveEvacCountdown() == 0)
 		{
-			class'GameState_RequestEvac'.static.RemoveExistingEvacZone(NewGameState);
+			class'XComGameState_RequestEvac'.static.RemoveExistingEvacZone(NewGameState);
 			EvacState.ResetRemoveEvacCountdown();
 		}
 	}
@@ -108,7 +108,7 @@ function EventListenerReturn OnTurnBegun(Object EventData, Object EventSource, X
 	{
 		// Decrement the counter if necessary
 		NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("UpdateEvacCountdown");
-		EvacState = GameState_RequestEvac(NewGameState.CreateStateObject(class'GameState_RequestEvac', EvacState.ObjectID));
+		EvacState = XComGameState_RequestEvac(NewGameState.CreateStateObject(class'XComGameState_RequestEvac', EvacState.ObjectID));
 		EvacState.SetCountdown(EvacState.GetCountdown() - 1);
 		NewGameState.AddStateObject(EvacState);
 		`TACTICALRULES.SubmitGameState(NewGameState);
@@ -125,7 +125,7 @@ function EventListenerReturn OnTurnBegun(Object EventData, Object EventSource, X
 
 function EventListenerReturn OnTileDataChanged(Object EventData, Object EventSource, XComGameState GameState, Name EventID, Object CallbackData)
 {
-	local GameState_RequestEvac EvacState;
+	local XComGameState_RequestEvac EvacState;
 	local XComGameStateHistory History;
 	local UISpecialMissionHUD SpecialMissionHUD;
 	local XComGameState NewGameState;
@@ -134,7 +134,7 @@ function EventListenerReturn OnTileDataChanged(Object EventData, Object EventSou
 	// `log("DEBUG : OnTileDataChanged", , 'RequestEvac');
 
 	History = `XCOMHISTORY;
-	EvacState = GameState_RequestEvac(History.GetSingleGameStateObjectForClass(class'GameState_RequestEvac', true));
+	EvacState = XComGameState_RequestEvac(History.GetSingleGameStateObjectForClass(class'XComGameState_RequestEvac', true));
 
 	// If no evac or it doesn't have an active timer, there isn't anything to do.
 	if (EvacState == none || EvacState.GetCountdown() < 1)
@@ -148,7 +148,7 @@ function EventListenerReturn OnTileDataChanged(Object EventData, Object EventSou
 		NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Invalidating Delayed Evac Zone");
 
 		// update the evac zone
-		EvacState = GameState_RequestEvac(NewGameState.CreateStateObject(class'GameState_RequestEvac', EvacState.ObjectID));
+		EvacState = XComGameState_RequestEvac(NewGameState.CreateStateObject(class'XComGameState_RequestEvac', EvacState.ObjectID));
 		EvacState.ResetCountdown();
 		XComGameStateContext_ChangeContainer(NewGameState.GetContext()).BuildVisualizationFn = EvacState.BuildVisualizationForFlareDestroyed;
 

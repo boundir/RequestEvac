@@ -1,10 +1,10 @@
-class Ability_RequestEvac extends X2Ability config(RequestEvac);
-
+class X2Ability_RequestEvac extends X2Ability config(RequestEvac);
 
 var config int ActionCost; // in tiles
 var config int GlobalCooldown; // in tiles
 var config int DistanceFromXComSquad;
 var config bool EvacInLOS;
+var config bool AlwaysOrientAlongLOP;
 var config bool FreeAction;
 var config bool ShouldBreakConcealment;
 
@@ -61,8 +61,9 @@ static function X2AbilityTemplate RequestEvac()
 	Cooldown.iNumTurns = default.GlobalCooldown;
 	Template.AbilityCooldown = Cooldown;
 
+	Template.CustomFireAnim = 'HL_SignalPoint';
 	Template.BuildNewGameStateFn = RequestEvac_BuildGameState;
-	Template.BuildVisualizationFn = TypicalAbility_BuildVisualization;
+	Template.BuildVisualizationFn = RequestEvac_BuildVisualization;
 
 	Template.bDontDisplayInAbilitySummary = true;
 
@@ -97,7 +98,7 @@ simulated function XComGameState RequestEvac_BuildGameState( XComGameStateContex
 	AbilityTemplate.ApplyCost(AbilityContext, AbilityState, UnitState, none, NewGameState);
 
 	Delay = GetEvacDelay();
-	class'GameState_RequestEvac'.static.InitiateEvacZoneDeployment(Delay, EvacLocation, NewGameState);
+	class'XComGameState_RequestEvac'.static.InitiateEvacZoneDeployment(Delay, EvacLocation, NewGameState);
 
 	//Return the game state we have created
 	return NewGameState;	
@@ -105,9 +106,14 @@ simulated function XComGameState RequestEvac_BuildGameState( XComGameStateContex
 
 simulated function RequestEvac_BuildVisualization(XComGameState VisualizeGameState)
 {
-	local GameState_RequestEvac EvacState;
+	local XComGameState_RequestEvac EvacState;
 
-	foreach VisualizeGameState.IterateByClassType(class'GameState_RequestEvac', EvacState)
+	if(!`XPROFILESETTINGS.Data.bEnableZipMode)
+	{
+		TypicalAbility_BuildVisualization(VisualizeGameState);
+	}
+
+	foreach VisualizeGameState.IterateByClassType(class'XComGameState_RequestEvac', EvacState)
 	{
 		break;
 	}
@@ -162,11 +168,11 @@ public function Vector GetEvacLocation()
 		{
 			// We didn't find a valid location with 10 attempts. We will search a valid location on the map.
 			IdealSpawnTilesOffset = `SYNC_RAND(50);
-			EvacLocation = SpawnManager.SelectReinforcementsLocation(none, XCOMLocation, IdealSpawnTilesOffset, false, false, false, true);
+			EvacLocation = SpawnManager.SelectReinforcementsLocation(none, XCOMLocation, IdealSpawnTilesOffset, false, false, false, default.AlwaysOrientAlongLOP);
 		}
 		else
 		{
-			EvacLocation = SpawnManager.SelectReinforcementsLocation(none, XCOMLocation, IdealSpawnTilesOffset, default.EvacInLOS, false, false, true);
+			EvacLocation = SpawnManager.SelectReinforcementsLocation(none, XCOMLocation, IdealSpawnTilesOffset, default.EvacInLOS, false, false, default.AlwaysOrientAlongLOP);
 		}
 
 		SearchAttempts++;

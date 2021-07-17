@@ -1,4 +1,4 @@
-class GameState_RequestEvac extends XComGameState_BaseObject config(RequestEvac);
+class XComGameState_RequestEvac extends XComGameState_BaseObject config(RequestEvac);
 
 // var config bool DisplayFlareBeforeEvacSpawn;
 var config int TurnsBeforeEvacExpires;
@@ -29,11 +29,11 @@ function OnEndTacticalPlay(XComGameState NewGameState)
 function EventListenerReturn OnEvacSpawnerCreated(Object EventData, Object EventSource, XComGameState GameState, Name EventID, Object CallbackData)
 {
 	local XComGameState NewGameState;
-	local GameState_RequestEvac NewSpawnerState;
+	local XComGameState_RequestEvac NewSpawnerState;
 
 	// Set up visualization to drop the flare.
 	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState(string(GetFuncName()));
-	NewSpawnerState = GameState_RequestEvac(NewGameState.ModifyStateObject(class'GameState_RequestEvac', ObjectID));
+	NewSpawnerState = XComGameState_RequestEvac(NewGameState.ModifyStateObject(class'XComGameState_RequestEvac', ObjectID));
 	XComGameStateContext_ChangeContainer(NewGameState.GetContext()).BuildVisualizationFn = BuildVisualizationForSpawnerCreation;
 	NewGameState.GetContext().SetAssociatedPlayTiming(SPT_AfterSequential);
 	`TACTICALRULES.SubmitGameState(NewGameState);
@@ -50,16 +50,16 @@ function EventListenerReturn OnEvacSpawnerCreated(Object EventData, Object Event
 
 function SoldierRequestEvac(XComGameState GameState)
 {
-	local GameState_RequestEvac SpawnerState;
+	local XComGameState_RequestEvac SpawnerState;
 	local VisualizationActionMetadata ActionMetadata;
 
-	SpawnerState = GameState_RequestEvac(`XCOMHISTORY.GetGameStateForObjectID(ObjectID));
+	SpawnerState = XComGameState_RequestEvac(`XCOMHISTORY.GetGameStateForObjectID(ObjectID));
 
 	ActionMetadata.StateObject_OldState = SpawnerState;
 	ActionMetadata.StateObject_NewState = SpawnerState;
 	ActionMetadata.VisualizeActor = SpawnerState.GetVisualizer();
 
-	class'Action_RequestEvac'.static.AddToVisualizationTree(ActionMetadata, GameState.GetContext());
+	class'X2Action_RequestEvac'.static.AddToVisualizationTree(ActionMetadata, GameState.GetContext());
 }
 
 // Visualize the spawner creation: drop a flare at the point the evac zone will appear.
@@ -67,14 +67,12 @@ function BuildVisualizationForSpawnerCreation(XComGameState VisualizeGameState)
 {
 	local VisualizationActionMetadata BuildTrack;
 	local XComGameStateHistory History;
-	local GameState_RequestEvac EvacSpawnerState;
+	local XComGameState_RequestEvac EvacSpawnerState;
 	local X2Action_PlayEffect EvacSpawnerEffectAction;
 	local X2Action_PlayNarrative NarrativeAction;
 
-	// `log("DEBUG : BuildVisualizationForSpawnerCreation", , 'RequestEvac');
-
 	History = `XCOMHISTORY;
-	EvacSpawnerState = GameState_RequestEvac(History.GetGameStateForObjectID(ObjectID));
+	EvacSpawnerState = XComGameState_RequestEvac(History.GetGameStateForObjectID(ObjectID));
 
 	// Temporary flare effect is the advent reinforce flare. Replace this.
 	EvacSpawnerEffectAction = X2Action_PlayEffect(class'X2Action_PlayEffect'.static.AddToVisualizationTree(BuildTrack, VisualizeGameState.GetContext(), false, BuildTrack.LastActionAdded));
@@ -124,10 +122,10 @@ function SpawnEvacZone()
 function EventListenerReturn OnSpawnEvacZoneComplete(Object EventData, Object EventSource, XComGameState GameState, Name EventID, Object CallbackData)
 {
 	local XComGameState NewGameState;
-	local GameState_RequestEvac NewSpawnerState;
+	local XComGameState_RequestEvac NewSpawnerState;
 
 	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Spawn Evac Zone Complete");
-	NewSpawnerState = GameState_RequestEvac(NewGameState.CreateStateObject(class'GameState_RequestEvac', ObjectID));
+	NewSpawnerState = XComGameState_RequestEvac(NewGameState.CreateStateObject(class'XComGameState_RequestEvac', ObjectID));
 	NewSpawnerState.ResetCountdown();
 	NewSpawnerState.InitRemoveEvacCountdown();
 	NewGameState.AddStateObject(NewSpawnerState);
@@ -159,7 +157,7 @@ function BuildVisualizationForEvacSpawn(XComGameState VisualizeState)
 	local XComGameState_EvacZone EvacZone;
 	local VisualizationActionMetadata BuildTrack;
 	local VisualizationActionMetadata EmptyTrack;
-	local GameState_RequestEvac EvacSpawnerState;
+	local XComGameState_RequestEvac EvacSpawnerState;
 	local X2Action_PlayEffect EvacSpawnerEffectAction;
 	local X2Action_PlayNarrative NarrativeAction;
 	local X2Action_RevealArea RevealAreaAction;
@@ -167,7 +165,7 @@ function BuildVisualizationForEvacSpawn(XComGameState VisualizeState)
 	History = `XCOMHISTORY;
 
 	// First, get rid of our old visualization from the delayed spawn.
-	EvacSpawnerState = GameState_RequestEvac(History.GetGameStateForObjectID(ObjectID));
+	EvacSpawnerState = XComGameState_RequestEvac(History.GetGameStateForObjectID(ObjectID));
 
 	EvacSpawnerEffectAction = X2Action_PlayEffect(class'X2Action_PlayEffect'.static.AddToVisualizationTree(BuildTrack, VisualizeState.GetContext(), false, BuildTrack.LastActionAdded));
 	EvacSpawnerEffectAction.EffectName = "LWEvacZone.P_EvacZone_Flare";
@@ -215,7 +213,7 @@ function InitEvac(int Turns, vector Loc)
 // Entry point: create a delayed evac zone instance with the given countdown and position.
 static function InitiateEvacZoneDeployment(int InitialCountdown, const out Vector DeploymentLocation, optional XComGameState IncomingGameState, optional bool bSkipCreationNarrative)
 {
-	local GameState_RequestEvac NewEvacSpawnerState;
+	local XComGameState_RequestEvac NewEvacSpawnerState;
 	local XComGameState NewGameState;
 	local X2EventManager EventManager;
 	local Object EvacObj;
@@ -231,14 +229,14 @@ static function InitiateEvacZoneDeployment(int InitialCountdown, const out Vecto
 		NewGameState = IncomingGameState;
 	}
 
-	NewEvacSpawnerState = GameState_RequestEvac(`XCOMHISTORY.GetSingleGameStateObjectForClass(class'GameState_RequestEvac', true));
+	NewEvacSpawnerState = XComGameState_RequestEvac(`XCOMHISTORY.GetSingleGameStateObjectForClass(class'XComGameState_RequestEvac', true));
 	if (NewEvacSpawnerState != none)
 	{
-		NewEvacSpawnerState = GameState_RequestEvac(NewGameState.ModifyStateObject(class'GameState_RequestEvac', NewEvacSpawnerState.ObjectID));
+		NewEvacSpawnerState = XComGameState_RequestEvac(NewGameState.ModifyStateObject(class'XComGameState_RequestEvac', NewEvacSpawnerState.ObjectID));
 	}
 	else
 	{
-		NewEvacSpawnerState = GameState_RequestEvac(NewGameState.CreateNewStateObject(class'GameState_RequestEvac'));
+		NewEvacSpawnerState = XComGameState_RequestEvac(NewGameState.CreateNewStateObject(class'XComGameState_RequestEvac'));
 	}
 
 	// Clean up any existing evac zone.
@@ -357,13 +355,13 @@ function static RemoveExistingEvacZone(XComGameState NewGameState)
 	//class'WorldInfo'.static.GetWorldInfo().StopAkSound('EvacZoneFlares');
 }
 
-static function GameState_RequestEvac GetPendingEvacZone()
+static function XComGameState_RequestEvac GetPendingEvacZone()
 {
-	local GameState_RequestEvac EvacState;
+	local XComGameState_RequestEvac EvacState;
 	local XComGameStateHistory History;
 
 	History = `XCOMHistory;
-	foreach History.IterateByClassType(class'GameState_RequestEvac', EvacState)
+	foreach History.IterateByClassType(class'XComGameState_RequestEvac', EvacState)
 	{
 		if (EvacState.GetCountdown() > 0)
 		{

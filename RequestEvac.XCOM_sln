@@ -3,15 +3,15 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # XCOM ModBuddy Solution File, Format Version 11.00
 VisualStudioVersion = 12.0.21005.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{5DAE07AF-E217-45C1-8DE7-FF99D6011E8A}") = "RequestEvac", "RequestEvac\RequestEvac.x2proj", "{088648E8-4311-4376-BBA6-BFD692AA62A8}"
+Project("{5DAE07AF-E217-45C1-8DE7-FF99D6011E8A}") = "RequestEvac", "RequestEvac\RequestEvac.x2proj", "{2CF29EB5-8AA2-429E-9C90-2135BB372822}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Default|XCOM 2 = Default|XCOM 2
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{088648E8-4311-4376-BBA6-BFD692AA62A8}.Default|XCOM 2.ActiveCfg = Default|XCOM 2
-		{088648E8-4311-4376-BBA6-BFD692AA62A8}.Default|XCOM 2.Build.0 = Default|XCOM 2
+		{2CF29EB5-8AA2-429E-9C90-2135BB372822}.Default|XCOM 2.ActiveCfg = Default|XCOM 2
+		{2CF29EB5-8AA2-429E-9C90-2135BB372822}.Default|XCOM 2.Build.0 = Default|XCOM 2
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -64,17 +64,17 @@ tags= War of the Chosen, Gameplay, Firebrand</Description>
     <Content Include="Config\XComEditor.ini" />
     <Content Include="Config\XComEngine.ini" />
     <Content Include="Config\XComGame.ini" />
-    <Content Include="Src\RequestEvac\Classes\Ability_RequestEvac.uc">
+    <Content Include="Src\RequestEvac\Classes\X2Ability_RequestEvac.uc">
       <SubType>Content</SubType>
     </Content>
-    <Content Include="Src\RequestEvac\Classes\Action_RequestEvac.uc">
+    <Content Include="Src\RequestEvac\Classes\X2Action_RequestEvac.uc">
       <SubType>Content</SubType>
     </Content>
     <Content Include="Src\RequestEvac\Classes\UIScreenListener_RequestEvac.uc">
       <SubType>Content</SubType>
     </Content>
     <Content Include="Src\RequestEvac\Classes\X2DownloadableContentInfo_RequestEvac.uc" />
-    <Content Include="Src\RequestEvac\Classes\GameState_RequestEvac.uc">
+    <Content Include="Src\RequestEvac\Classes\XComGameState_RequestEvac.uc">
       <SubType>Content</SubType>
     </Content>
   </ItemGroup>

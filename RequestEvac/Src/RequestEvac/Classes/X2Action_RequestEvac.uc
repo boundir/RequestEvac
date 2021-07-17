@@ -1,20 +1,15 @@
 //-----------------------------------------------------------
 // Used by the visualizer system to control a Visualization Actor
 //-----------------------------------------------------------
-class Action_RequestEvac extends X2Action
-	config(GameCore);
-
-var private const config float LookAtEvacZoneDuration; // in seconds
+class X2Action_RequestEvac extends X2Action	config(GameCore);
 
 var XComGameStateContext_Ability AbilityContext;
 var XGUnit UnitWhoRequestedEvac;
-
 
 function Init()
 {
 	super.Init();
 
-	// `log("DEBUG : Action_RequestEvac", , 'RequestEvac');
 	AbilityContext = XComGameStateContext_Ability(StateChangeContext);
 	if (AbilityContext != None)
 	{
