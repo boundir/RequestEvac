@@ -1,4 +1,4 @@
-class X2Ability_RequestEvac extends X2Ability config(RequestEvac);
+class X2Ability_RequestEvac extends X2Ability_AbortMission config(RequestEvac);
 
 var config int ActionCost; // in tiles
 var config int GlobalCooldown; // in tiles
@@ -9,6 +9,7 @@ var config bool FreeAction;
 var config bool ShouldBreakConcealment;
 
 var config bool RandomizeEvacTurns;
+var config bool PlaceEvac;
 var config int TurnsBeforeEvac;
 var config int MinimumTurnBeforeEvac;
 var config int MaximumTurnsBeforeEvac;
@@ -45,12 +46,7 @@ static function X2AbilityTemplate RequestEvac()
 	Template.AbilityShooterConditions.AddItem(default.LivingShooterProperty);
 	Template.AbilityTriggers.AddItem(default.PlayerInputTrigger);
 
-	Template.AbilityTargetStyle = default.SelfTarget;
-
-	if(default.ShouldBreakConcealment)
-	{
-		Template.ConcealmentRule = eConceal_Never;
-	}
+	Template.ConcealmentRule = default.ShouldBreakConcealment ? eConceal_Never : eConceal_Always;
 
 	ActionPointCost = new class'X2AbilityCost_ActionPoints';
 	ActionPointCost.iNumPoints = default.ActionCost;
@@ -62,6 +58,17 @@ static function X2AbilityTemplate RequestEvac()
 	Template.AbilityCooldown = Cooldown;
 
 	Template.CustomFireAnim = 'HL_SignalPoint';
+
+	if(default.PlaceEvac)
+	{
+		Template.AbilityTargetStyle = new class'X2AbilityTarget_Cursor';
+		Template.TargetingMethod = class'X2TargetingMethod_EvacZone';
+	}
+	else
+	{
+		Template.AbilityTargetStyle = default.SelfTarget;
+	}
+
 	Template.BuildNewGameStateFn = RequestEvac_BuildGameState;
 	Template.BuildVisualizationFn = RequestEvac_BuildVisualization;
 
@@ -80,7 +87,7 @@ simulated function XComGameState RequestEvac_BuildGameState( XComGameStateContex
 	local XComGameStateHistory History;
 
 	local int Delay;
-	local Vector EvacLocation; // actually used spawn location, out parameter
+	local Vector EvacLocation;
 
 	History = `XCOMHISTORY;
 	//Build the new game state frame
@@ -90,8 +97,14 @@ simulated function XComGameState RequestEvac_BuildGameState( XComGameStateContex
 	AbilityState = XComGameState_Ability(History.GetGameStateForObjectID(AbilityContext.InputContext.AbilityRef.ObjectID, eReturnType_Reference));	
 	AbilityTemplate = AbilityState.GetMyTemplate();
 
-	// Use of AIReinforcementSpawner methods
-	EvacLocation = GetEvacLocation();
+	if(default.PlaceEvac)
+	{
+		EvacLocation = AbilityContext.InputContext.TargetLocations[0];
+	}
+	else
+	{
+		EvacLocation = GetEvacLocation();
+	}
 
 	UnitState = XComGameState_Unit(NewGameState.ModifyStateObject(class'XComGameState_Unit', AbilityContext.InputContext.SourceObject.ObjectID));
 	//Apply the cost of the ability
