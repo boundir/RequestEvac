@@ -1,0 +1,6 @@
+[XComGameState_RequestEvac]
+strEvacRequestTitle="EVAC Demandée"
+strEvacRequestSubtitle="Tours avant que le Mercure n'arrive"
+
+strRemoveEvacTitle="EVAC Arrivée"
+strRemoveEvacSubtitle="Tours avant que le Mercure ne quitte la zone"

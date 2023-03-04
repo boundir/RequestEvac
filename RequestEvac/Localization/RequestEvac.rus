@@ -1,0 +1,6 @@
+[XComGameState_RequestEvac]
+strEvacRequestTitle="Запрошена эвакуация"
+strEvacRequestSubtitle="Ходов до прибытия «Подстрекателя»"
+
+strRemoveEvacTitle="Эвакуация доступна"
+strRemoveEvacSubtitle="Ходов до отлета «Подстрекателя»"
