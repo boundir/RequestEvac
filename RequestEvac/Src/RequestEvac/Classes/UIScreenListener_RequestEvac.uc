@@ -43,8 +43,6 @@ function UpdateEvacTimer(bool DecrementCounter)
 		return;
 	}
 
-	// `log("DEBUG : UpdateEvacTimer", , 'RequestEvac');
-
 	// Update the UI
 	if (EvacState.GetCountdown() > 0)
 	{

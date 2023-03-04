@@ -18,7 +18,6 @@ static function array<X2DataTemplate> CreateTemplates()
 {
 	local array<X2DataTemplate> Templates;
 
-	`log("RequestEvac loaded");
 	Templates.AddItem(RequestEvac());
 
 	return Templates;
@@ -31,7 +30,7 @@ static function X2AbilityTemplate RequestEvac()
 	local X2AbilityCost_ActionPoints        ActionPointCost;
 	local X2AbilityCooldown_Global          Cooldown;
 
-	`CREATE_X2ABILITY_TEMPLATE(Template, 'PlaceEvacZone');
+	`CREATE_X2ABILITY_TEMPLATE(Template, 'RequestEvacZone');
 
 	Template.RemoveTemplateAvailablility(Template.BITFIELD_GAMEAREA_Multiplayer); // Do not allow "Evac Zone Placement" in MP!
 
@@ -137,21 +136,27 @@ simulated function RequestEvac_BuildVisualization(XComGameState VisualizeGameSta
 
 function int GetEvacDelay()
 {
-	local int Idx, Delay;
-	local array<int> EvacNumbers;
+	local XComLWTuple LWTuple;
+	local XComLWTValue LWTupleValue;
+	local int Delay;
 
-	if(default.RandomizeEvacTurns)
-	{
-		for(Idx = default.MinimumTurnBeforeEvac; Idx <= default.MaximumTurnsBeforeEvac; Idx++)
-		{
-			EvacNumbers.AddItem(Idx);
-		}
-		Delay = EvacNumbers[Rand(EvacNumbers.Length)];
-	}
-	else
-	{
-		Delay = default.TurnsBeforeEvac;
-	}
+	LWTupleValue.kind = XComLWTVInt;
+	LWTupleValue.i = default.TurnsBeforeEvac;
+
+	LWTuple = new class'XComLWTuple';
+	LWTuple.id = 'RequestEvacDelay';
+	LWTuple.Data.AddItem(LWTupleValue);
+
+	`XEVENTMGR.TriggerEvent('GetEvacTurnsDelay', LWTuple, none);
+
+	if (LWTupleValue.Data.Length != 1 || LWTupleValue.Data[0].Kind != XComLWTVInt)
+    {
+        Delay = class'X2Helper_RequestEvac'.static.GetEvacDelayConfig();
+    }
+    else
+    {
+        Delay = LWTupleValue.Data[0].i;
+    }
 
 	return Delay;
 }
@@ -175,7 +180,7 @@ public function Vector GetEvacLocation()
 	while(!LocationFound)
 	{
 		IdealSpawnTilesOffset = `SYNC_RAND(default.DistanceFromXComSquad);
-		`LOG("Searching Valid Evac Location:" @ IdealSpawnTilesOffset, , 'RequestEvac');
+		// `LOG("Searching Valid Evac Location:" @ IdealSpawnTilesOffset, , 'RequestEvac');
 
 		if(SearchAttempts > 10)
 		{

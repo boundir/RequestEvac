@@ -23,6 +23,9 @@ tags= War of the Chosen, Gameplay, Firebrand</Description>
     <Folder Include="Src\RequestEvac\Classes\" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Config\XComInfiltration.ini">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Config\XComNarrative.ini">
       <SubType>Content</SubType>
     </Content>
@@ -74,6 +77,12 @@ tags= War of the Chosen, Gameplay, Firebrand</Description>
       <SubType>Content</SubType>
     </Content>
     <Content Include="Src\RequestEvac\Classes\X2DownloadableContentInfo_RequestEvac.uc" />
+    <Content Include="Src\RequestEvac\Classes\X2EventListener_RequestEvac.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\RequestEvac\Classes\X2Helper_RequestEvac.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\RequestEvac\Classes\XComGameState_RequestEvac.uc">
       <SubType>Content</SubType>
     </Content>
