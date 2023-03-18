@@ -8,55 +8,36 @@ tags= War of the Chosen, Gameplay, Firebrand</Description>
     <SteamPublishID>0</SteamPublishID>
     <AssemblyName>RequestEvac</AssemblyName>
     <RootNamespace>RequestEvac</RootNamespace>
+    <ProjectGuid>{b4a8fdbd-5d0f-4cc0-b757-2be97b1dd0d5}</ProjectGuid>
   </PropertyGroup>
   <ItemGroup>
     <Folder Include="Config\" />
-    <Folder Include="Content\Sounds" />
-    <Folder Include="Content\Sounds\INT" />
     <Folder Include="Localization\" />
-    <Folder Include="Content" />
-    <Folder Include="Localization\ESN\" />
-    <Folder Include="Localization\INT" />
-    <Folder Include="Localization\FRA" />
+    <Folder Include="ContentForCook" />
     <Folder Include="Src\" />
     <Folder Include="Src\RequestEvac\" />
     <Folder Include="Src\RequestEvac\Classes\" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Config\XComNarrative.ini">
-      <SubType>Content</SubType>
-    </Content>
     <Content Include="Config\XComRequestEvac.ini">
       <SubType>Content</SubType>
     </Content>
-    <Content Include="Content\LWEvacZone.upk">
+    <Content Include="ContentForCook\BDRequestEvac.upk">
       <SubType>Content</SubType>
     </Content>
-    <Content Include="Content\LWNarrativeMoments.upk">
+    <Content Include="ContentOptions.json">
       <SubType>Content</SubType>
     </Content>
-    <Content Include="Content\Sounds\INT\LWSoundSpeechTacticalFirebrand.upk">
+    <Content Include="Localization\RequestEvac.esn">
       <SubType>Content</SubType>
     </Content>
-    <Content Include="Content\Sounds\LWSoundSpeechTacticalFirebrand_Cue.upk">
+    <Content Include="Localization\RequestEvac.fra">
       <SubType>Content</SubType>
     </Content>
-    <Content Include="Localization\ESN\RequestEvac.esn">
+    <Content Include="Localization\RequestEvac.int">
       <SubType>Content</SubType>
     </Content>
-    <Content Include="Localization\ESN\XComGame.esn">
-      <SubType>Content</SubType>
-    </Content>
-    <Content Include="Localization\FRA\RequestEvac.fra">
-      <SubType>Content</SubType>
-    </Content>
-    <Content Include="Localization\FRA\XComGame.fra">
-      <SubType>Content</SubType>
-    </Content>
-    <Content Include="Localization\INT\RequestEvac.int">
-      <SubType>Content</SubType>
-    </Content>
-    <Content Include="Localization\INT\XComGame.int">
+    <Content Include="Localization\RequestEvac.rus">
       <SubType>Content</SubType>
     </Content>
     <Content Include="ReadMe.txt" />
@@ -64,19 +45,30 @@ tags= War of the Chosen, Gameplay, Firebrand</Description>
     <Content Include="Config\XComEditor.ini" />
     <Content Include="Config\XComEngine.ini" />
     <Content Include="Config\XComGame.ini" />
+    <Content Include="Src\extra_globals.uci">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\RequestEvac\Classes\X2Ability_RequestEvac.uc">
       <SubType>Content</SubType>
     </Content>
-    <Content Include="Src\RequestEvac\Classes\X2Action_RequestEvac.uc">
+    <Content Include="Src\RequestEvac\Classes\X2Action_DestroyActor.uc">
       <SubType>Content</SubType>
     </Content>
-    <Content Include="Src\RequestEvac\Classes\UIScreenListener_RequestEvac.uc">
+    <Content Include="Src\RequestEvac\Classes\X2Action_UpdateEvacTimer.uc">
       <SubType>Content</SubType>
     </Content>
     <Content Include="Src\RequestEvac\Classes\X2DownloadableContentInfo_RequestEvac.uc" />
+    <Content Include="Src\RequestEvac\Classes\X2Item_RequestEvac.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\RequestEvac\Classes\XComGameState_RequestEvac.uc">
       <SubType>Content</SubType>
     </Content>
   </ItemGroup>
-  <Import Project="$(MSBuildLocalExtensionPath)\XCOM2.targets" />
+  <PropertyGroup>
+    <SolutionRoot>$(MSBuildProjectDirectory)\..\</SolutionRoot>
+    <ScriptsDir>$(SolutionRoot).scripts\</ScriptsDir>
+    <BuildCommonRoot>$(ScriptsDir)X2ModBuildCommon\</BuildCommonRoot>
+  </PropertyGroup>
+  <Import Project="$(BuildCommonRoot)XCOM2.targets" />
 </Project>

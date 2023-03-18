@@ -1,0 +1,1 @@
+`define RELOG(msg) `LOG(GetFuncName() @ `msg, class'X2Ability_RequestEvac'.default.bLog, 'RequestEvac')
