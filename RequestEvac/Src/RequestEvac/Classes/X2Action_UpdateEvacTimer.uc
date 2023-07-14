@@ -7,7 +7,7 @@ simulated state Executing
 	begin:
 
 		EvacState = XComGameState_RequestEvac(`XCOMHISTORY.GetSingleGameStateObjectForClass(class'XComGameState_RequestEvac', true));
-		if (EvacState != none)
+		if (EvacState != none && !EvacState.bRemoved)
 		{
 			EvacState.UpdateEvacTimer();
 		}

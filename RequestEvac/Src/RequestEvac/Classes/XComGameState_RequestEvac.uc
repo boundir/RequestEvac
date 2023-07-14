@@ -43,8 +43,9 @@ static final function XComGameState_RequestEvac InitiateEvacZoneDeployment(XComG
 	}
 
 	NewEvacSpawnerState = XComGameState_RequestEvac(`XCOMHISTORY.GetSingleGameStateObjectForClass(class'XComGameState_RequestEvac', true));
-	if (NewEvacSpawnerState != none)
+	if (NewEvacSpawnerState != none && !NewEvacSpawnerState.bRemoved)
 	{
+		`RELOG("Found existing state object for the Evac State" @ NewEvacSpawnerState.ObjectID @ NewEvacSpawnerState.bRemoved);
 		NewEvacSpawnerState = XComGameState_RequestEvac(NewGameState.ModifyStateObject(class'XComGameState_RequestEvac', NewEvacSpawnerState.ObjectID));
 	}
 	else
@@ -125,6 +126,8 @@ private function RegisterForEvents()
 	EventManager = `XEVENTMGR;
 	ThisObj = self;	
 
+	`RELOG("Request Evac State Object registering for events:" @ self.ObjectID);
+
 	EventManager.RegisterForEvent(ThisObj, 'PlayerTurnBegun', OnPlayerTurnBegun, ELD_OnStateSubmitted,,);
 	EventManager.RegisterForEvent(ThisObj, 'TileDataChanged', OnTileDataChanged, ELD_OnStateSubmitted,,);
 	EventManager.RegisterForEvent(ThisObj, 'EvacZoneDestroyed', OnEvacZoneDestroyed, ELD_OnStateSubmitted,,);
@@ -146,6 +149,8 @@ private function UnregisterFromAllEvents()
 
 	EventManager = `XEVENTMGR;
 	ThisObj = self;
+
+	`RELOG("Request Evac State Object unregistering from all events:" @ self.ObjectID);
 
 	EventManager.UnRegisterFromEvent(ThisObj, 'PlayerTurnBegun');
 	EventManager.UnRegisterFromEvent(ThisObj, 'TileDataChanged');
@@ -189,6 +194,8 @@ private function EventListenerReturn OnPlayerTurnBegun(Object EventData, Object 
 			XComGameStateContext_ChangeContainer(NewGameState.GetContext()).BuildVisualizationFn = RemoveEvacZone_BuildVisualization;
 
 			// Remove the Evac State oject too, since it serves no purpose at this point.
+
+			`RELOG("Removing Request Evac State object:" @ self.ObjectID);
 			NewGameState.RemoveStateObject(self.ObjectID);
 		}
 
