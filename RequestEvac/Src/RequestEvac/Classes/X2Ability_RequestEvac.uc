@@ -83,7 +83,7 @@ static private function XComGameState RequestEvac_BuildGameState(XComGameStateCo
 	SetGlobalCooldown('PlaceEvacZone', EvacState.GetCountdown() + EvacState.TurnsBeforeEvacExpires, UnitState.ControllingPlayer.ObjectID, NewGameState);
 
 	//Return the game state we have created
-	return NewGameState;	
+	return NewGameState;
 }
 
 static private function RequestEvac_BuildVisualization(XComGameState VisualizeGameState)

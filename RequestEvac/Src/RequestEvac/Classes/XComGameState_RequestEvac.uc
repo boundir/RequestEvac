@@ -96,23 +96,25 @@ final function SpawnEvacZone(XComGameState NewGameState)
 // Evac zone has expired, time for Skyranger to leave.
 private function RemoveEvacZone(XComGameState NewGameState)
 {
-    local XComGameState_EvacZone EvacZone;
+	local XComGameState_EvacZone EvacZone;
 
 	`RELOG(GetFuncName() @ "Running");
 
 	UnregisterFromAllEvents();
 
 	// Disable the evac ability
-    class'XComGameState_BattleData'.static.SetGlobalAbilityEnabled('Evac', false, NewGameState);
+	class'XComGameState_BattleData'.static.SetGlobalAbilityEnabled('Evac', false, NewGameState);
 
 	EvacZone = class'XComGameState_EvacZone'.static.GetEvacZone();
-    if (EvacZone == none)
-        return;
+	if (EvacZone == none)
+	{
+		return;
+	}
 
 	`RELOG(GetFuncName() @ "Found existing evac zone, removing");
 
-    // Remove the evac zone state
-    NewGameState.RemoveStateObject(EvacZone.ObjectID);
+	// Remove the evac zone state
+	NewGameState.RemoveStateObject(EvacZone.ObjectID);
 }
 
 // --------------------------------------------------------------------------------------------------------------
@@ -124,7 +126,7 @@ private function RegisterForEvents()
 	local Object ThisObj;
 
 	EventManager = `XEVENTMGR;
-	ThisObj = self;	
+	ThisObj = self;
 
 	`RELOG("Request Evac State Object registering for events:" @ self.ObjectID);
 
@@ -170,13 +172,12 @@ private function EventListenerReturn OnPlayerTurnBegun(Object EventData, Object 
 	local XComGameState_RequestEvac		NewEvacState;
 	local XComGameState					NewGameState;
 
-	// `RELOG("DEBUG : OnTurnBegun", , 'RequestEvac');
-	// `RELOG("DEBUG : OnTurnBegun GetCountdown" @ EvacState.GetCountdown(), , 'RequestEvac');
-	// `RELOG("DEBUG : OnTurnBegun GetRemoveEvacCountdown" @ EvacState.GetRemoveEvacCountdown(), , 'RequestEvac');
 
 	PlayerState = XComGameState_Player(EventData);
 	if (PlayerState == none || PlayerState.GetTeam() != eTeam_XCom)
+	{
 		return ELR_NoInterrupt;
+	}
 
 	// If Evac Zone is already spawned, tick its timer, and remove it if it's time to do so.
 	if (GetRemoveEvacCountdown() > 0)
@@ -190,18 +191,16 @@ private function EventListenerReturn OnPlayerTurnBegun(Object EventData, Object 
 		if (NewEvacState.GetRemoveEvacCountdown() == 0)
 		{
 			NewEvacState.ResetRemoveEvacCountdown();
+			HideRemoveEvacCountdownTimer();
 			NewEvacState.RemoveEvacZone(NewGameState);
 			XComGameStateContext_ChangeContainer(NewGameState.GetContext()).BuildVisualizationFn = RemoveEvacZone_BuildVisualization;
 
-			// Remove the Evac State oject too, since it serves no purpose at this point.
-
+			// Remove the Evac State object too, since it serves no purpose at this point.
 			`RELOG("Removing Request Evac State object:" @ self.ObjectID);
 			NewGameState.RemoveStateObject(self.ObjectID);
 		}
 
 		`TACTICALRULES.SubmitGameState(NewGameState);
-
-		return ELR_NoInterrupt;
 	}
 	else if (GetCountdown() > 0) // If Evac Flare is up, tick its timer, and spawn the Evac Zone, if it's time.
 	{
@@ -282,7 +281,7 @@ private function RemoveEvacZone_BuildVisualization(XComGameState VisualizeGameSt
 		ActionMetadata.VisualizeActor = `XCOMHISTORY.GetVisualizer(EvacZone.ObjectID);
 	
 		`RELOG(GetFuncName() @ "It was removed:" @ ActionMetadata.StateObject_OldState.bRemoved);
-		`RELOG(GetFuncName() @ "It is  removed:" @ ActionMetadata.StateObject_NewState.bRemoved);
+		`RELOG(GetFuncName() @ "It is removed:" @ ActionMetadata.StateObject_NewState.bRemoved);
 		`RELOG(GetFuncName() @ "Found visualizer:" @ ActionMetadata.VisualizeActor != none);
 
 		class'X2Action_DestroyActor'.static.AddToVisualizationTree(ActionMetadata, VisualizeGameState.GetContext());
@@ -393,7 +392,9 @@ private function EventListenerReturn OnEvacZoneDestroyed(Object EventData, Objec
 
 	// If no evac or it doesn't have an active timer, there isn't anything to do.
 	if (GetRemoveEvacCountdown() < 1)
+	{
 		return ELR_NoInterrupt;
+	}
 
 	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Recreating Evac Zone");
 	class'XComGameState_RequestEvac'.static.InitiateEvacZoneDeployment(NewGameState,, 0);
@@ -465,9 +466,9 @@ final function UpdateEvacTimer()
 
 	SpecialMissionHUD = `PRES.GetSpecialMissionHUD();
 	if (SpecialMissionHUD == none)
+	{
 		return;
-
-	// `RELOG("DEBUG : UpdateEvacTimer", , 'RequestEvac');
+	}
 
 	// Update the UI
 	if (GetCountdown() > 0)
@@ -490,6 +491,19 @@ final function UpdateEvacTimer()
 	}
 }
 
+final function HideRemoveEvacCountdownTimer()
+{
+	local UISpecialMissionHUD SpecialMissionHUD;
+
+	SpecialMissionHUD = `PRES.GetSpecialMissionHUD();
+	if (SpecialMissionHUD == none)
+	{
+		return;
+	}
+
+	SpecialMissionHUD.m_kTurnCounter2.Hide();
+}
+
 
 // --------------------------------------------------------------------------------------------------------------
 // Getters, Setters, Resetters
@@ -500,6 +514,7 @@ function int GetCountdown()
 {
 	return Countdown;
 }
+
 function int GetRemoveEvacCountdown()
 {
 	return RemoveEvacCountdown;
@@ -512,6 +527,7 @@ function SetCountdown(int NewCountdown)
 {
 	Countdown = NewCountdown;
 }
+
 function SetRemoveEvacCountdown(int NewCountdown)
 {
 	RemoveEvacCountdown = NewCountdown;
@@ -522,14 +538,15 @@ function SetRemoveEvacCountdown(int NewCountdown)
 
 function InitRemoveEvacCountdown()
 {
-	// `RELOG("DEBUG : InitRemoveEvacCountdown" @ default.TurnsBeforeEvacExpires, , 'RequestEvac');
 	RemoveEvacCountdown = default.TurnsBeforeEvacExpires;
 }
+
 function ResetCountdown()
 {
 	// Clear the countdown (effectively disable the spawner)
 	Countdown = -1;
 }
+
 function ResetRemoveEvacCountdown()
 {
 	// Clear the countdown (effectively disable the spawner)
