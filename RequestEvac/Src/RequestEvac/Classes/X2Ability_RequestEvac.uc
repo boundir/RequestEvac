@@ -18,7 +18,7 @@ var config bool bLog;
 static final function PatchEvacAbilityTemplate(X2AbilityTemplate Template)
 {
 	local X2AbilityCost_ActionPoints ActionPointCost;
-	
+
 	// Targeting
 	if (default.PlaceEvac)
 	{
@@ -49,8 +49,8 @@ static final function PatchEvacAbilityTemplate(X2AbilityTemplate Template)
 static private function XComGameState RequestEvac_BuildGameState(XComGameStateContext Context)
 {
 	local XComGameState					NewGameState;
-	local XComGameState_Unit			UnitState;	
-	local XComGameState_Ability			AbilityState;	
+	local XComGameState_Unit			UnitState;
+	local XComGameState_Ability			AbilityState;
 	local XComGameStateContext_Ability	AbilityContext;
 	local X2AbilityTemplate				AbilityTemplate;
 	local XComGameStateHistory			History;
@@ -59,10 +59,10 @@ static private function XComGameState RequestEvac_BuildGameState(XComGameStateCo
 
 	History = `XCOMHISTORY;
 	//Build the new game state frame
-	NewGameState = History.CreateNewGameState(true, Context);	
+	NewGameState = History.CreateNewGameState(true, Context);
 
-	AbilityContext = XComGameStateContext_Ability(NewGameState.GetContext());	
-	AbilityState = XComGameState_Ability(History.GetGameStateForObjectID(AbilityContext.InputContext.AbilityRef.ObjectID, eReturnType_Reference));	
+	AbilityContext = XComGameStateContext_Ability(NewGameState.GetContext());
+	AbilityState = XComGameState_Ability(History.GetGameStateForObjectID(AbilityContext.InputContext.AbilityRef.ObjectID, eReturnType_Reference));
 	AbilityTemplate = AbilityState.GetMyTemplate();
 
 	UnitState = XComGameState_Unit(NewGameState.ModifyStateObject(class'XComGameState_Unit', AbilityContext.InputContext.SourceObject.ObjectID));
@@ -108,7 +108,7 @@ static private function RequestEvac_BuildVisualization(XComGameState VisualizeGa
 	{
 		TypicalAbility_BuildVisualization(VisualizeGameState);
 	}
-	
+
 	// ## Set up track for the soldier
 	ActionMetadata.StateObject_OldState = History.GetGameStateForObjectID(AbilityContext.InputContext.SourceObject.ObjectID,, VisualizeGameState.HistoryIndex - 1);
 	ActionMetadata.StateObject_NewState = VisualizeGameState.GetGameStateForObjectID(AbilityContext.InputContext.SourceObject.ObjectID);
@@ -138,8 +138,11 @@ static private function RequestEvac_BuildVisualization(XComGameState VisualizeGa
 	{
 		break;
 	}
+
 	if (EvacState == none)
+	{
 		return;
+	}
 
 	if (EvacState.GetCountdown() > 0)
 	{
@@ -147,7 +150,7 @@ static private function RequestEvac_BuildVisualization(XComGameState VisualizeGa
 		ActionMetadata.StateObject_OldState = EvacState;
 		ActionMetadata.StateObject_NewState = EvacState;
 
-		//  drop a flare at the point the evac zone will appear.
+		// drop a flare at the point the evac zone will appear.
 		EvacSpawnerEffectAction = X2Action_PlayEffect(class'X2Action_PlayEffect'.static.AddToVisualizationTree(ActionMetadata, AbilityContext, false, TimedWait));
 		EvacSpawnerEffectAction.EffectName = "BDRequestEvac.P_EvacZone_Flare";
 		EvacSpawnerEffectAction.EffectLocation = EvacState.GetLocation();
@@ -168,13 +171,15 @@ static private function RequestEvac_BuildVisualization(XComGameState VisualizeGa
 		NarrativeAction.WaitForCompletion = false;
 	}
 	else
-	{	
+	{
 		foreach VisualizeGameState.IterateByClassType(class'XComGameState_EvacZone', EvacZone)
 		{
 			break;
 		}
 		if (EvacZone == none)
+		{
 			return;
+		}
 
 		ActionMetadata = EmptyMetadata;
 		ActionMetadata.StateObject_OldState = EvacZone;
@@ -196,7 +201,6 @@ static private function RequestEvac_BuildVisualization(XComGameState VisualizeGa
 		RevealAreaAction.AssociatedObjectID = EvacZone.ObjectID;
 	}
 }
-
 
 // Keeping these two functions here to avoid having to deal with config variables.
 static final function int GenerateEvacDelay()
@@ -232,10 +236,10 @@ static final function vector GenerateEvacLocation()
 
 	WorldData = `XWORLD;
 	SpawnManager = `SPAWNMGR;
-	
+
 	XCOMLocation = SpawnManager.GetCurrentXComLocation();
 	SearchAttempts = 0;
-	
+
 	while (true)
 	{
 		IdealSpawnTilesOffset = `SYNC_RAND_STATIC(default.DistanceFromXComSquad);
@@ -259,7 +263,7 @@ static final function vector GenerateEvacLocation()
 		}
 
 		`RELOG(`ShowVar(GeneratedLocation));
-	
+
 		if (!WorldData.Volume.EncompassesPoint(GeneratedLocation))
 		{
 			`RELOG("This location is not encompassed by world volume, skipping.");
