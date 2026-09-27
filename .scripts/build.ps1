@@ -12,7 +12,6 @@ Write-Host "Sourcing $common"
 
 $builder = [BuildProject]::new("RequestEvac", $srcDirectory, $sdkPath, $gamePath)
 $builder.SetContentOptionsJsonFilename("ContentOptions.json")
-$builder.IncludeSrc("$srcDirectory\CustomSrc")
 
 switch ($config)
 {
