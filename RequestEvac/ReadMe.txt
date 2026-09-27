@@ -12,14 +12,14 @@ All can be changed in the config folder in [u]XComRequestEvac.ini[/u]
 
 [h1]Notes[/h1]
 
-Do not use this mod if you're using the Tutorial. You won't be able to place the evac because it is modifying the Place Evac ability.
+The mod stands down automatically on two tutorial mission and missions with pre-placed evac zone.
 
 [h1]Credits[/h1]
 
 Thanks to Maluco Marinero and his Delayed Evac mod from where I took most of the code regarding delaying the time for the evac to spawn.
 Thanks to Pavonis Interactive, tracktwo, Amineri for their implementation.
 Thanks to Astral Descend for his help on finding how the missions handled evac spawn.
-Thanks to Iridar for the latest update improvements.
+Thanks to Iridar for the update improvements.
 
 [h1]Troubleshooting[/h1]
 https://www.reddit.com/r/xcom2mods/wiki/mod_troubleshooting
