@@ -10,6 +10,12 @@ tags= War of the Chosen, Gameplay, Firebrand</Description>
     <RootNamespace>RequestEvac</RootNamespace>
     <ProjectGuid>{b4a8fdbd-5d0f-4cc0-b757-2be97b1dd0d5}</ProjectGuid>
   </PropertyGroup>
+  <PropertyGroup>
+    <SolutionRoot>$(MSBuildProjectDirectory)\..\</SolutionRoot>
+    <ScriptsDir>$(SolutionRoot).scripts\</ScriptsDir>
+    <BuildCommonRoot>$(ScriptsDir)X2ModBuildCommon\</BuildCommonRoot>
+  </PropertyGroup>
+  <Import Project="$(BuildCommonRoot)XCOM2.targets" />
   <ItemGroup>
     <Folder Include="Config\" />
     <Folder Include="Localization\" />
@@ -17,8 +23,6 @@ tags= War of the Chosen, Gameplay, Firebrand</Description>
     <Folder Include="Src\" />
     <Folder Include="Src\RequestEvac\" />
     <Folder Include="Src\RequestEvac\Classes\" />
-  </ItemGroup>
-  <ItemGroup>
     <Content Include="Config\XComRequestEvac.ini">
       <SubType>Content</SubType>
     </Content>
@@ -64,11 +68,7 @@ tags= War of the Chosen, Gameplay, Firebrand</Description>
     <Content Include="Src\RequestEvac\Classes\XComGameState_RequestEvac.uc">
       <SubType>Content</SubType>
     </Content>
+    <Content Include="PublishedFileId.ID" />
+    <Content Include="Src\RequestEvac\Classes\UIScreenListener_RequestEvac.uc" />
   </ItemGroup>
-  <PropertyGroup>
-    <SolutionRoot>$(MSBuildProjectDirectory)\..\</SolutionRoot>
-    <ScriptsDir>$(SolutionRoot).scripts\</ScriptsDir>
-    <BuildCommonRoot>$(ScriptsDir)X2ModBuildCommon\</BuildCommonRoot>
-  </PropertyGroup>
-  <Import Project="$(BuildCommonRoot)XCOM2.targets" />
 </Project>

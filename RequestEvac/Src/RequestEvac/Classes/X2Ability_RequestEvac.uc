@@ -1,5 +1,7 @@
 class X2Ability_RequestEvac extends X2Ability config(RequestEvac);
 
+var config name EvacAbilityName;
+
 var config int ActionCost;
 var config int DistanceFromXComSquad;
 var config bool EvacInLOS;
@@ -15,11 +17,138 @@ var config int MaximumTurnsBeforeEvac;
 
 var config bool bLog;
 
+struct EvacTemplateBackup
+{
+	var X2AbilityTemplate Template;
+	var X2AbilityTemplate VanillaCopy;
+};
+
+// Marked config purely so a static function is allowed to assign to `default.` at all.
+var private config array<EvacTemplateBackup> TemplateBackups;
+
+static final function PatchEvacAbilityTemplates()
+{
+	local X2AbilityTemplateManager		AbilityMgr;
+	local array<X2DataTemplate>			DataTemplates;
+	local X2DataTemplate				DataTemplate;
+	local X2AbilityTemplate				Template;
+	local array<EvacTemplateBackup>		Backups;
+	local EvacTemplateBackup			Backup;
+
+	AbilityMgr = class'X2AbilityTemplateManager'.static.GetAbilityTemplateManager();
+	AbilityMgr.FindDataTemplateAllDifficulties(default.EvacAbilityName, DataTemplates);
+
+	foreach DataTemplates(DataTemplate)
+	{
+		Template = X2AbilityTemplate(DataTemplate);
+
+		if (Template == none)
+		{
+			continue;
+		}
+
+		Backup.Template		= Template;
+		Backup.VanillaCopy	= new class'X2AbilityTemplate';
+
+		Backup.VanillaCopy.AbilityTargetStyle	= Template.AbilityTargetStyle;
+		Backup.VanillaCopy.TargetingMethod		= Template.TargetingMethod;
+		Backup.VanillaCopy.AbilityCosts			= Template.AbilityCosts;
+		Backup.VanillaCopy.CustomFireAnim		= Template.CustomFireAnim;
+		Backup.VanillaCopy.Hostility			= Template.Hostility;
+		Backup.VanillaCopy.ConcealmentRule		= Template.ConcealmentRule;
+		Backup.VanillaCopy.BuildNewGameStateFn	= Template.BuildNewGameStateFn;
+		Backup.VanillaCopy.BuildVisualizationFn	= Template.BuildVisualizationFn;
+
+		Backups.AddItem(Backup);
+	}
+
+	default.TemplateBackups = Backups;
+
+	`RELOG("Found" @ Backups.Length @ "variant(s) of ability" @ default.EvacAbilityName);
+
+	if (Backups.Length == 0)
+	{
+		`Redscreen("[WOTC] Request Evac: could not find the '" $ default.EvacAbilityName $ "' ability template, the mod will have no effect. If another mod renames the evac ability, set EvacAbilityName in XComRequestEvac.ini.");
+		return;
+	}
+
+	ApplyEvacAbilityPatch();
+}
+
+static final function ApplyEvacAbilityPatch()
+{
+	local EvacTemplateBackup Backup;
+
+	RestoreEvacAbilityTemplates();
+
+	foreach default.TemplateBackups(Backup)
+	{
+		PatchEvacAbilityTemplate(Backup.Template);
+	}
+
+	`RELOG("Applied the Request Evac patch to" @ default.TemplateBackups.Length @ "template(s).");
+}
+
+static final function RestoreEvacAbilityTemplates()
+{
+	local EvacTemplateBackup Backup;
+
+	foreach default.TemplateBackups(Backup)
+	{
+		if (Backup.Template == none || Backup.VanillaCopy == none)
+		{
+			continue;
+		}
+
+		Backup.Template.AbilityTargetStyle = Backup.VanillaCopy.AbilityTargetStyle;
+		Backup.Template.TargetingMethod = Backup.VanillaCopy.TargetingMethod;
+		Backup.Template.AbilityCosts = Backup.VanillaCopy.AbilityCosts;
+		Backup.Template.CustomFireAnim = Backup.VanillaCopy.CustomFireAnim;
+		Backup.Template.Hostility = Backup.VanillaCopy.Hostility;
+		Backup.Template.ConcealmentRule = Backup.VanillaCopy.ConcealmentRule;
+		Backup.Template.BuildNewGameStateFn = Backup.VanillaCopy.BuildNewGameStateFn;
+		Backup.Template.BuildVisualizationFn = Backup.VanillaCopy.BuildVisualizationFn;
+	}
+}
+
+static final function bool IsTutorialMission()
+{
+	local XComTacticalGRI TacticalGRI;
+
+	TacticalGRI = XComTacticalGRI(class'WorldInfo'.static.GetWorldInfo().GRI);
+
+	if (TacticalGRI == none)
+	{
+		return false;
+	}
+
+	return XComTutorialMgr(TacticalGRI.ReplayMgr) != none;
+}
+
+// Called on every tactical start.
+static final function UpdateEvacAbilityForCurrentMission()
+{
+	if (IsTutorialMission())
+	{
+		`RELOG("Tutorial mission detected - standing down for this mission.");
+		RestoreEvacAbilityTemplates();
+	}
+	else
+	{
+		ApplyEvacAbilityPatch();
+	}
+}
+
 static final function PatchEvacAbilityTemplate(X2AbilityTemplate Template)
 {
-	local X2AbilityCost_ActionPoints ActionPointCost;
+	local X2AbilityCost_ActionPoints	ActionPointCost;
+	local int							Idx;
 
-	// Targeting
+	if (Template == none)
+	{
+		return;
+	}
+
 	if (default.PlaceEvac)
 	{
 		Template.AbilityTargetStyle = new class'X2AbilityTarget_Cursor';
@@ -31,13 +160,19 @@ static final function PatchEvacAbilityTemplate(X2AbilityTemplate Template)
 		Template.TargetingMethod = class'X2TargetingMethod_TopDown';
 	}
 
-	// Cost
+	for (Idx = Template.AbilityCosts.Length - 1; Idx >= 0; Idx--)
+	{
+		if (X2AbilityCost_ActionPoints(Template.AbilityCosts[Idx]) != none)
+		{
+			Template.AbilityCosts.Remove(Idx, 1);
+		}
+	}
+
 	ActionPointCost = new class'X2AbilityCost_ActionPoints';
 	ActionPointCost.iNumPoints = default.ActionCost;
 	ActionPointCost.bFreeCost = default.FreeAction;
 	Template.AbilityCosts.AddItem(ActionPointCost);
 
-	// State and Vis
 	Template.CustomFireAnim = 'HL_SignalPoint';
 	Template.Hostility = eHostility_Neutral;
 	Template.BuildNewGameStateFn = RequestEvac_BuildGameState;
@@ -58,7 +193,6 @@ static private function XComGameState RequestEvac_BuildGameState(XComGameStateCo
 	local XComGameState_RequestEvac		EvacState;
 
 	History = `XCOMHISTORY;
-	//Build the new game state frame
 	NewGameState = History.CreateNewGameState(true, Context);
 
 	AbilityContext = XComGameStateContext_Ability(NewGameState.GetContext());
@@ -66,7 +200,6 @@ static private function XComGameState RequestEvac_BuildGameState(XComGameStateCo
 	AbilityTemplate = AbilityState.GetMyTemplate();
 
 	UnitState = XComGameState_Unit(NewGameState.ModifyStateObject(class'XComGameState_Unit', AbilityContext.InputContext.SourceObject.ObjectID));
-	//Apply the cost of the ability
 	AbilityTemplate.ApplyCost(AbilityContext, AbilityState, UnitState, none, NewGameState);
 
 	if (default.PlaceEvac)
@@ -80,9 +213,8 @@ static private function XComGameState RequestEvac_BuildGameState(XComGameStateCo
 	}
 
 	// Put the Request Evac ability on cooldown that's equal to the delay before Skyranger arrives + delay after Skyranger leaves.
-	SetGlobalCooldown('PlaceEvacZone', EvacState.GetCountdown() + EvacState.TurnsBeforeEvacExpires, UnitState.ControllingPlayer.ObjectID, NewGameState);
+	SetGlobalCooldown(AbilityTemplate.DataName, Max(EvacState.GetCountdown(), 0) + EvacState.TurnsBeforeEvacExpires, UnitState.ControllingPlayer.ObjectID, NewGameState);
 
-	//Return the game state we have created
 	return NewGameState;
 }
 
