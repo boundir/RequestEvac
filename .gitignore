@@ -1,2 +1,6 @@
 BuildCache/
 *.XCOM_suo
+
+# Machine-specific SDK/game paths for the VS Code build tasks. .vscode is already ignored globally; kept explicit here.
+.vscode/settings.json
+*.XCOM_sln
