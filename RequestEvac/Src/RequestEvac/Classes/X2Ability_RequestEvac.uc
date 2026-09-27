@@ -202,10 +202,10 @@ static private function XComGameState RequestEvac_BuildGameState(XComGameStateCo
 	UnitState = XComGameState_Unit(NewGameState.ModifyStateObject(class'XComGameState_Unit', AbilityContext.InputContext.SourceObject.ObjectID));
 	AbilityTemplate.ApplyCost(AbilityContext, AbilityState, UnitState, none, NewGameState);
 
-	if (default.PlaceEvac)
+	if (default.PlaceEvac && AbilityContext.InputContext.TargetLocations.Length > 0)
 	{
 		EvacLocation = AbilityContext.InputContext.TargetLocations[0];
-		EvacState = class'XComGameState_RequestEvac'.static.InitiateEvacZoneDeployment(NewGameState, EvacLocation);
+		EvacState = class'XComGameState_RequestEvac'.static.InitiateEvacZoneDeployment(NewGameState, EvacLocation,, true);
 	}
 	else
 	{
@@ -251,7 +251,7 @@ static private function RequestEvac_BuildVisualization(XComGameState VisualizeGa
 	SoundAndFlyOver = X2Action_PlaySoundAndFlyOver(class'X2Action_PlaySoundAndFlyover'.static.AddToVisualizationTree(ActionMetadata, AbilityContext,, CommonParent));
 
 	// Use some RNG to choose the voiceline to say; base game does the same thing.
-	if (`SYNC_RAND_STATIC(100) < 10)
+	if (Rand(100) < 10)
 	{
 		SoundAndFlyOver.CharSpeech = 'MissionAbortRequest';
 	}
@@ -337,26 +337,20 @@ static private function RequestEvac_BuildVisualization(XComGameState VisualizeGa
 // Keeping these two functions here to avoid having to deal with config variables.
 static final function int GenerateEvacDelay()
 {
-	local int Idx, Delay;
-	local array<int> EvacNumbers;
+	local int MinDelay, MaxDelay;
 
-	if (default.RandomizeEvacTurns)
+	if (!default.RandomizeEvacTurns)
 	{
-		for (Idx = default.MinimumTurnBeforeEvac; Idx <= default.MaximumTurnsBeforeEvac; Idx++)
-		{
-			EvacNumbers.AddItem(Idx);
-		}
-		Delay = EvacNumbers[`SYNC_RAND_STATIC(EvacNumbers.Length)];
-	}
-	else
-	{
-		Delay = default.TurnsBeforeEvac;
+		return Max(default.TurnsBeforeEvac, 0);
 	}
 
-	return Delay;
+	MinDelay = Max(default.MinimumTurnBeforeEvac, 0);
+	MaxDelay = Max(default.MaximumTurnsBeforeEvac, MinDelay);
+
+	return MinDelay + `SYNC_RAND_STATIC(MaxDelay - MinDelay + 1);
 }
 
-static final function vector GenerateEvacLocation()
+static final function vector GenerateEvacLocation(optional out int OutFoundValidLocation)
 {
 	local int					IdealSpawnTilesOffset;
 	local int					SearchAttempts;
@@ -370,31 +364,22 @@ static final function vector GenerateEvacLocation()
 	SpawnManager = `SPAWNMGR;
 
 	XCOMLocation = SpawnManager.GetCurrentXComLocation();
-	SearchAttempts = 0;
+	OutFoundValidLocation = 0;
 
-	while (true)
+	for (SearchAttempts = 0; SearchAttempts <= 100; SearchAttempts++)
 	{
-		IdealSpawnTilesOffset = `SYNC_RAND_STATIC(default.DistanceFromXComSquad);
-		`RELOG("Searching Valid Evac Location:" @ `ShowVar(IdealSpawnTilesOffset));
-
-		if (SearchAttempts > 100)
-		{
-			`RELOG("WARNING :: Failed to find a valid evac location in 100 attempts, breaking to avoid a crash.");
-			return vect(0, 0, 0);
-		}
-		else if (SearchAttempts > 10)
+		if (SearchAttempts > 10)
 		{
 			IdealSpawnTilesOffset = `SYNC_RAND_STATIC(50);
 			GeneratedLocation = SpawnManager.SelectReinforcementsLocation(none, XCOMLocation, IdealSpawnTilesOffset, false, false, true /*bRequiresVerticalClearance*/, default.AlwaysOrientAlongLOP);
-
-			`RELOG("Failed to find a valid evac location in XCOM LOS in 10 attempts, searching everywhere on the map.");
 		}
 		else
 		{
+			IdealSpawnTilesOffset = `SYNC_RAND_STATIC(Max(default.DistanceFromXComSquad, 1));
 			GeneratedLocation = SpawnManager.SelectReinforcementsLocation(none, XCOMLocation, IdealSpawnTilesOffset, default.EvacInLOS, false, true /*bRequiresVerticalClearance*/, default.AlwaysOrientAlongLOP);
 		}
 
-		`RELOG(`ShowVar(GeneratedLocation));
+		`RELOG("Attempt" @ SearchAttempts @ `ShowVar(IdealSpawnTilesOffset) @ `ShowVar(GeneratedLocation));
 
 		if (!WorldData.Volume.EncompassesPoint(GeneratedLocation))
 		{
@@ -402,16 +387,19 @@ static final function vector GenerateEvacLocation()
 			continue;
 		}
 
-		SpawnTile = `XWORLD.GetTileCoordinatesFromPosition(GeneratedLocation);
+		SpawnTile = WorldData.GetTileCoordinatesFromPosition(GeneratedLocation);
+
 		if (class'X2TargetingMethod_EvacZone'.static.ValidateEvacArea(SpawnTile, false))
 		{
 			`RELOG("This is a valid evac location.");
+			OutFoundValidLocation = 1;
 			return GeneratedLocation;
 		}
 
 		`RELOG("This location is not valid for evac, skipping.");
-		SearchAttempts++;
 	}
+
+	`RELOG("WARNING :: Failed to find a valid evac location in 100 attempts, giving up.");
 
 	return GeneratedLocation;
 }
@@ -425,30 +413,31 @@ static private function SetGlobalCooldown(const name AbilityName, const int Cool
 	local XComGameState			NewGameState;
 	local XComGameState_Player	PlayerState;
 
-	if (UseGameState != none)
+	if (XComGameState_Player(`XCOMHISTORY.GetGameStateForObjectID(SourcePlayerID)) == none)
 	{
-		PlayerState = XComGameState_Player(UseGameState.GetGameStateForObjectID(SourcePlayerID));
-		if (PlayerState == none)
-		{
-			PlayerState = XComGameState_Player(`XCOMHISTORY.GetGameStateForObjectID(SourcePlayerID));
-			if (PlayerState == none) return;
-
-			PlayerState = XComGameState_Player(UseGameState.ModifyStateObject(PlayerState.Class, PlayerState.ObjectID));
-			PlayerState.SetCooldown(AbilityName, Cooldown);
-		}
-		else
-		{
-			PlayerState.SetCooldown(AbilityName, Cooldown);
-		}
+		`RELOG("WARNING :: No player state for object ID" @ SourcePlayerID @ "- cannot set global cooldown for" @ AbilityName);
+		return;
 	}
-	else
-	{
-		PlayerState = XComGameState_Player(`XCOMHISTORY.GetGameStateForObjectID(SourcePlayerID));
-		if (PlayerState == none) return;
 
+	NewGameState = UseGameState;
+
+	if (NewGameState == none)
+	{
 		NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState(AbilityName @ "set global cooldown:" @ Cooldown);
-		PlayerState = XComGameState_Player(NewGameState.ModifyStateObject(PlayerState.Class, PlayerState.ObjectID));
-		PlayerState.SetCooldown(AbilityName, Cooldown);
+	}
+
+	PlayerState = XComGameState_Player(NewGameState.GetGameStateForObjectID(SourcePlayerID));
+
+	if (PlayerState == none)
+	{
+		PlayerState = XComGameState_Player(NewGameState.ModifyStateObject(class'XComGameState_Player', SourcePlayerID));
+	}
+
+	PlayerState.SetCooldown(AbilityName, Cooldown);
+
+	// Only submit the state if we're the ones who created it.
+	if (UseGameState == none)
+	{
 		`GAMERULES.SubmitGameState(NewGameState);
 	}
 }

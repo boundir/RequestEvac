@@ -7,6 +7,10 @@ var private localized string strRemoveEvacSubtitle;
 
 // Extends XCGS_Item as a hack so we get access to X2VisualizedInterface functions.
 
+const FlareEffectName = "BDRequestEvac.P_EvacZone_Flare";
+
+const EvacRevealRadiusTiles = 5.0;
+
 // var config bool DisplayFlareBeforeEvacSpawn;
 var config int TurnsBeforeEvacExpires;
 var privatewrite int Countdown;
@@ -16,22 +20,30 @@ var privatewrite bool MissionHasEvacPlaced;
 
 // Entry point: create a delayed evac zone instance with the given countdown and position.
 // or generate countdown and position if they're not given.
-static final function XComGameState_RequestEvac InitiateEvacZoneDeployment(XComGameState NewGameState, optional const vector OverrideDeploymentLocation, optional const int OverrideInitialDelay = -1)
+static final function XComGameState_RequestEvac InitiateEvacZoneDeployment(XComGameState NewGameState, optional const vector OverrideDeploymentLocation, optional const int OverrideInitialDelay = -1, optional const bool bForceOverrideLocation = false)
 {
 	local XComGameState_RequestEvac NewEvacSpawnerState;
 	local vector DeploymentLocation;
-	local vector EmptyVector;
 	local int InitialCountdown;
+	local int FoundValidLocation;
 
-	`RELOG("Running with parameters:" @ `ShowVar(OverrideDeploymentLocation) @ `ShowVar(OverrideInitialDelay));
+	`RELOG("Running with parameters:" @ `ShowVar(OverrideDeploymentLocation) @ `ShowVar(OverrideInitialDelay) @ `ShowVar(bForceOverrideLocation));
 
-	if (OverrideDeploymentLocation != EmptyVector)
+	if (bForceOverrideLocation || !IsZero(OverrideDeploymentLocation))
 	{
 		DeploymentLocation = OverrideDeploymentLocation;
 	}
 	else
 	{
-		DeploymentLocation = class'X2Ability_RequestEvac'.static.GenerateEvacLocation();
+		DeploymentLocation = class'X2Ability_RequestEvac'.static.GenerateEvacLocation(FoundValidLocation);
+
+		if (FoundValidLocation == 0)
+		{
+			// Falling through with the generated vector would drop the evac zone at the map origin, which reads as a silent failure.
+			// Land next to the squad instead.
+			`Redscreen("[WOTC] Request Evac: failed to find a valid evac location, falling back to the XCOM squad location.");
+			DeploymentLocation = `SPAWNMGR.GetCurrentXComLocation();
+		}
 	}
 
 	if (OverrideInitialDelay != -1)
@@ -107,14 +119,16 @@ private function RemoveEvacZone(XComGameState NewGameState)
 	// Disable the evac ability
 	class'XComGameState_BattleData'.static.SetGlobalAbilityEnabled('Evac', false, NewGameState);
 
-	EvacZone = class'XComGameState_EvacZone'.static.GetEvacZone();
+	// Deliberately not XComGameState_EvacZone::GetEvacZone() that returns any evac zone, including one the mission placed itself.
+	EvacZone = GetRequestedEvacZone();
 
 	if (EvacZone == none)
 	{
+		`RELOG("No requested evac zone to remove.");
 		return;
 	}
 
-	`RELOG(GetFuncName() @ "Found existing evac zone, removing");
+	`RELOG("Found the requested evac zone, removing it:" @ EvacZone.ObjectID);
 
 	// Remove the evac zone state
 	NewGameState.RemoveStateObject(EvacZone.ObjectID);
@@ -161,7 +175,6 @@ private function UnregisterFromAllEvents()
 	EventManager.UnRegisterFromEvent(ThisObj, 'TileDataChanged');
 	EventManager.UnRegisterFromEvent(ThisObj, 'EvacZoneDestroyed');
 	EventManager.UnRegisterFromEvent(ThisObj, 'EvacRequested');
-	EventManager.UnRegisterFromEvent(ThisObj, 'PlayerTurnBegun');
 }
 
 // --------------------------------------------------------------------------------------------------------------
@@ -181,13 +194,20 @@ private function EventListenerReturn OnPlayerTurnBegun(Object EventData, Object 
 		return ELR_NoInterrupt;
 	}
 
-	if (MissionEvacExist())
+	if (MissionEvacExists())
 	{
+		// Only submit a state if something actually changes.
+		if (MissionHasEvacPlaced && GetCountdown() < 0 && GetRemoveEvacCountdown() < 0)
+		{
+			return ELR_NoInterrupt;
+		}
+
 		NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("ResetTimers");
 		NewEvacState = XComGameState_RequestEvac(NewGameState.ModifyStateObject(self.Class, self.ObjectID));
+		NewEvacState.SetMissionHasEvacPlaced(true);
 		NewEvacState.ResetCountdown();
 		NewEvacState.ResetRemoveEvacCountdown();
-		XComGameStateContext_ChangeContainer(NewGameState.GetContext()).BuildVisualizationFn = SpawnEvacZone_BuildVisualization;
+		XComGameStateContext_ChangeContainer(NewGameState.GetContext()).BuildVisualizationFn = StopFlare_BuildVisualization;
 
 		`TACTICALRULES.SubmitGameState(NewGameState);
 
@@ -206,7 +226,6 @@ private function EventListenerReturn OnPlayerTurnBegun(Object EventData, Object 
 		if (NewEvacState.GetRemoveEvacCountdown() == 0)
 		{
 			NewEvacState.ResetRemoveEvacCountdown();
-			HideRemoveEvacCountdownTimer();
 			NewEvacState.RemoveEvacZone(NewGameState);
 			XComGameStateContext_ChangeContainer(NewGameState.GetContext()).BuildVisualizationFn = RemoveEvacZone_BuildVisualization;
 
@@ -237,31 +256,82 @@ private function EventListenerReturn OnPlayerTurnBegun(Object EventData, Object 
 	return ELR_NoInterrupt;
 }
 
+// --------------------------------------------------------------------------------------------------------------
+// Shared visualization helpers
+
+private static function X2Action_PlayEffect AddFlareAction(out VisualizationActionMetadata ActionMetadata, XComGameStateContext Context, vector FlareLocation, bool bStopFlare, optional X2Action ParentAction)
+{
+	local X2Action_PlayEffect FlareAction;
+
+	FlareAction = X2Action_PlayEffect(class'X2Action_PlayEffect'.static.AddToVisualizationTree(ActionMetadata, Context, false, ParentAction));
+	FlareAction.EffectName = FlareEffectName;
+	FlareAction.EffectLocation = FlareLocation;
+	FlareAction.bStopEffect = bStopFlare;
+	FlareAction.bWaitForCompletion = false;
+	FlareAction.bWaitForCameraCompletion = false;
+
+	return FlareAction;
+}
+
+private static function X2Action_RevealArea AddRevealAreaAction(out VisualizationActionMetadata ActionMetadata, XComGameStateContext Context, vector RevealLocation, int EvacZoneObjectID, optional X2Action ParentAction)
+{
+	local X2Action_RevealArea RevealAreaAction;
+
+	RevealAreaAction = X2Action_RevealArea(class'X2Action_RevealArea'.static.AddToVisualizationTree(ActionMetadata, Context, false, ParentAction));
+	RevealAreaAction.ScanningRadius = class'XComWorldData'.const.WORLD_StepSize * EvacRevealRadiusTiles;
+	RevealAreaAction.TargetLocation = RevealLocation;
+	RevealAreaAction.bDestroyViewer = false;
+	RevealAreaAction.AssociatedObjectID = EvacZoneObjectID;
+
+	return RevealAreaAction;
+}
+
+private static function X2Action_RevealArea AddDestroyViewerAction(out VisualizationActionMetadata ActionMetadata, XComGameStateContext Context, int EvacZoneObjectID, optional X2Action ParentAction)
+{
+	local X2Action_RevealArea RevealAreaAction;
+
+	RevealAreaAction = X2Action_RevealArea(class'X2Action_RevealArea'.static.AddToVisualizationTree(ActionMetadata, Context, false, ParentAction));
+	RevealAreaAction.bDestroyViewer = true;
+	RevealAreaAction.AssociatedObjectID = EvacZoneObjectID;
+
+	return RevealAreaAction;
+}
+
+private static function XComNarrativeMoment GetEvacDestroyedMoment()
+{
+	if (Frand() > 0.5)
+	{
+		return XComNarrativeMoment(`CONTENT.RequestGameArchetype("X2NarrativeMoments.TACTICAL.Extract.Central_Extract_VIP_Evac_Destroyed"));
+	}
+
+	return XComNarrativeMoment(`CONTENT.RequestGameArchetype("X2NarrativeMoments.TACTICAL.RescueVIP.Central_Rescue_VIP_EvacDestroyed"));
+}
+
+// --------------------------------------------------------------------------------------------------------------
+
+private function StopFlare_BuildVisualization(XComGameState VisualizeGameState)
+{
+	local VisualizationActionMetadata ActionMetadata;
+
+	ActionMetadata.StateObject_OldState = self;
+	ActionMetadata.StateObject_NewState = self;
+
+	AddFlareAction(ActionMetadata, VisualizeGameState.GetContext(), GetLocation(), true);
+}
+
 // Visualize the evac spawn: turn off the flare we dropped as a countdown visualizer and visualize the evac zone dropping.
 private function SpawnEvacZone_BuildVisualization(XComGameState VisualizeGameState)
 {
 	local XComGameState_EvacZone		EvacZone;
 	local VisualizationActionMetadata	ActionMetadata;
 	local VisualizationActionMetadata	EmptyTrack;
-	local X2Action_PlayEffect			EvacSpawnerEffectAction;
 	local X2Action_PlayNarrative		NarrativeAction;
-	local X2Action_RevealArea			RevealAreaAction;
 
 	// First, get rid of our old visualization from the delayed spawn.
 	ActionMetadata.StateObject_OldState = self;
 	ActionMetadata.StateObject_NewState = self;
 
-	EvacSpawnerEffectAction = X2Action_PlayEffect(class'X2Action_PlayEffect'.static.AddToVisualizationTree(ActionMetadata, VisualizeGameState.GetContext(), false, ActionMetadata.LastActionAdded));
-	EvacSpawnerEffectAction.EffectName = "BDRequestEvac.P_EvacZone_Flare";
-	EvacSpawnerEffectAction.EffectLocation = GetLocation();
-	EvacSpawnerEffectAction.bStopEffect = true;
-	EvacSpawnerEffectAction.bWaitForCompletion = false;
-	EvacSpawnerEffectAction.bWaitForCameraCompletion = false;
-
-	if (MissionHasEvacPlaced)
-	{
-		return;
-	}
+	AddFlareAction(ActionMetadata, VisualizeGameState.GetContext(), GetLocation(), true);
 
 	// Now add the new visualization for the evac zone placement.
 	foreach VisualizeGameState.IterateByClassType(class'XComGameState_EvacZone', EvacZone)
@@ -271,11 +341,7 @@ private function SpawnEvacZone_BuildVisualization(XComGameState VisualizeGameSta
 		ActionMetadata.StateObject_NewState = EvacZone;
 		ActionMetadata.VisualizeActor = EvacZone.GetVisualizer();
 
-		RevealAreaAction = X2Action_RevealArea(class'X2Action_RevealArea'.static.AddToVisualizationTree(ActionMetadata, VisualizeGameState.GetContext()));
-		RevealAreaAction.ScanningRadius = class'XComWorldData'.const.WORLD_StepSize * 5.0f;
-		RevealAreaAction.TargetLocation = GetLocation();
-		RevealAreaAction.bDestroyViewer = false;
-		RevealAreaAction.AssociatedObjectID = EvacZone.ObjectID;
+		AddRevealAreaAction(ActionMetadata, VisualizeGameState.GetContext(), GetLocation(), EvacZone.ObjectID);
 
 		class'X2Action_PlaceEvacZone'.static.AddToVisualizationTree(ActionMetadata, VisualizeGameState.GetContext(), false, ActionMetadata.LastActionAdded);
 
@@ -300,9 +366,9 @@ private function RemoveEvacZone_BuildVisualization(XComGameState VisualizeGameSt
 		ActionMetadata.StateObject_NewState = EvacZone;
 		ActionMetadata.VisualizeActor = `XCOMHISTORY.GetVisualizer(EvacZone.ObjectID);
 
-		`RELOG(GetFuncName() @ "It was removed:" @ ActionMetadata.StateObject_OldState.bRemoved);
-		`RELOG(GetFuncName() @ "It is removed:" @ ActionMetadata.StateObject_NewState.bRemoved);
-		`RELOG(GetFuncName() @ "Found visualizer:" @ ActionMetadata.VisualizeActor != none);
+		`RELOG("Removed:" @ EvacZone.bRemoved @ "Found visualizer:" @ ActionMetadata.VisualizeActor != none);
+
+		AddDestroyViewerAction(ActionMetadata, VisualizeGameState.GetContext(), EvacZone.ObjectID);
 
 		class'X2Action_DestroyActor'.static.AddToVisualizationTree(ActionMetadata, VisualizeGameState.GetContext());
 		class'X2Action_UpdateEvacTimer'.static.AddToVisualizationTree(ActionMetadata, VisualizeGameState.GetContext());
@@ -336,7 +402,7 @@ private function EventListenerReturn OnTileDataChanged(Object EventData, Object 
 		NewEvacState = XComGameState_RequestEvac(NewGameState.ModifyStateObject(self.Class, self.ObjectID));
 		`XEVENTMGR.TriggerEvent('EvacSpawnerDestroyed', NewEvacState, NewEvacState, NewGameState);
 
-		class'XComGameState_RequestEvac'.static.InitiateEvacZoneDeployment(NewGameState,, GetCountdown());
+		NewEvacState = class'XComGameState_RequestEvac'.static.InitiateEvacZoneDeployment(NewGameState,, GetCountdown());
 		XComGameStateContext_ChangeContainer(NewGameState.GetContext()).BuildVisualizationFn = RespawnFlare_BuildVisualization;
 
 		`RELOG("Moving Evac Flare from:" @ GetLocation() @ "to:" @ NewEvacState.GetLocation());
@@ -366,30 +432,15 @@ static private function RespawnFlare_BuildVisualization(XComGameState VisualizeG
 		ActionMetadata.StateObject_OldState = OldEvacState;
 		ActionMetadata.StateObject_NewState = NewEvacState;
 
-		FlareEffectAction = X2Action_PlayEffect(class'X2Action_PlayEffect'.static.AddToVisualizationTree(ActionMetadata, VisualizeGameState.GetContext()));
-		FlareEffectAction.EffectName = "BDRequestEvac.P_EvacZone_Flare";
-		FlareEffectAction.EffectLocation = OldEvacState.GetLocation();
-		FlareEffectAction.bStopEffect = true;
-		FlareEffectAction.bWaitForCompletion = false;
-		FlareEffectAction.bWaitForCameraCompletion = false;
+		// Put out the old flare.
+		AddFlareAction(ActionMetadata, VisualizeGameState.GetContext(), OldEvacState.GetLocation(), true);
 
 		NarrativeAction = X2Action_PlayNarrative(class'X2Action_PlayNarrative'.static.AddToVisualizationTree(ActionMetadata, VisualizeGameState.GetContext(), false, ActionMetadata.LastActionAdded));
-	
-		if (Frand() > 0.5)
-		{
-			NarrativeAction.Moment = XComNarrativeMoment(`CONTENT.RequestGameArchetype("X2NarrativeMoments.TACTICAL.Extract.Central_Extract_VIP_Evac_Destroyed"));
-		}
-		else
-		{
-			NarrativeAction.Moment = XComNarrativeMoment(`CONTENT.RequestGameArchetype("X2NarrativeMoments.TACTICAL.RescueVIP.Central_Rescue_VIP_EvacDestroyed"));
-		}
-	
+		NarrativeAction.Moment = GetEvacDestroyedMoment();
 		NarrativeAction.WaitForCompletion = true;
 
-		FlareEffectAction = X2Action_PlayEffect(class'X2Action_PlayEffect'.static.AddToVisualizationTree(ActionMetadata, VisualizeGameState.GetContext(), false, ActionMetadata.LastActionAdded));
-		FlareEffectAction.EffectName = "BDRequestEvac.P_EvacZone_Flare";
-		FlareEffectAction.EffectLocation = NewEvacState.GetLocation();
-		FlareEffectAction.bStopEffect = false;
+		// Light a new one where the zone is going to land instead.
+		FlareEffectAction = AddFlareAction(ActionMetadata, VisualizeGameState.GetContext(), NewEvacState.GetLocation(), false, ActionMetadata.LastActionAdded);
 		FlareEffectAction.bWaitForCameraCompletion = true;
 		FlareEffectAction.CenterCameraOnEffectDuration = 2.0f; // Hold camera on the new evac flare for a couple seconds.
 
@@ -424,8 +475,8 @@ private function EventListenerReturn OnEvacZoneDestroyed(Object EventData, Objec
 	}
 
 	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Recreating Evac Zone");
-	class'XComGameState_RequestEvac'.static.InitiateEvacZoneDeployment(NewGameState,, 0);
-	NewEvacState = XComGameState_RequestEvac(NewGameState.GetGameStateForObjectID(self.ObjectID));
+
+	NewEvacState = class'XComGameState_RequestEvac'.static.InitiateEvacZoneDeployment(NewGameState,, 0);
 	NewEvacState.SetRemoveEvacCountdown(GetRemoveEvacCountdown());
 	XComGameStateContext_ChangeContainer(NewGameState.GetContext()).BuildVisualizationFn = RespawnEvac_BuildVisualization;
 
@@ -441,7 +492,6 @@ private function RespawnEvac_BuildVisualization(XComGameState VisualizeGameState
 	local XComGameState_EvacZone		EvacZone;
 	local VisualizationActionMetadata	ActionMetadata;
 	local X2Action_PlayNarrative		NarrativeAction;
-	local X2Action_RevealArea			RevealAreaAction;
 
 	// Add visualization for the evac zone placement.
 	foreach VisualizeGameState.IterateByClassType(class'XComGameState_EvacZone', EvacZone)
@@ -450,30 +500,16 @@ private function RespawnEvac_BuildVisualization(XComGameState VisualizeGameState
 		ActionMetadata.StateObject_NewState = EvacZone;
 		ActionMetadata.VisualizeActor = EvacZone.GetVisualizer();
 
-		RevealAreaAction = X2Action_RevealArea(class'X2Action_RevealArea'.static.AddToVisualizationTree(ActionMetadata, VisualizeGameState.GetContext()));
-		RevealAreaAction.bDestroyViewer = true;
-		RevealAreaAction.AssociatedObjectID = EvacZone.ObjectID;
+		// Drop the viewer from the zone that just got destroyed before creating a new one.
+		AddDestroyViewerAction(ActionMetadata, VisualizeGameState.GetContext(), EvacZone.ObjectID);
 
 		NarrativeAction = X2Action_PlayNarrative(class'X2Action_PlayNarrative'.static.AddToVisualizationTree(ActionMetadata, VisualizeGameState.GetContext(), false, ActionMetadata.LastActionAdded));
-
-		if (Frand() > 0.5)
-		{
-			NarrativeAction.Moment = XComNarrativeMoment(`CONTENT.RequestGameArchetype("X2NarrativeMoments.TACTICAL.Extract.Central_Extract_VIP_Evac_Destroyed"));
-		}
-		else
-		{
-			NarrativeAction.Moment = XComNarrativeMoment(`CONTENT.RequestGameArchetype("X2NarrativeMoments.TACTICAL.RescueVIP.Central_Rescue_VIP_EvacDestroyed"));
-		}
-
+		NarrativeAction.Moment = GetEvacDestroyedMoment();
 		NarrativeAction.WaitForCompletion = true;
 
 		class'X2Action_PlaceEvacZone'.static.AddToVisualizationTree(ActionMetadata, VisualizeGameState.GetContext(), false, ActionMetadata.LastActionAdded);
 
-		RevealAreaAction = X2Action_RevealArea(class'X2Action_RevealArea'.static.AddToVisualizationTree(ActionMetadata, VisualizeGameState.GetContext()));
-		RevealAreaAction.ScanningRadius = class'XComWorldData'.const.WORLD_StepSize * 5.0f;
-		RevealAreaAction.TargetLocation = GetLocation();
-		RevealAreaAction.bDestroyViewer = false;
-		RevealAreaAction.AssociatedObjectID = EvacZone.ObjectID;
+		AddRevealAreaAction(ActionMetadata, VisualizeGameState.GetContext(), GetLocation(), EvacZone.ObjectID);
 
 		break;
 	}
@@ -484,13 +520,22 @@ private function RespawnEvac_BuildVisualization(XComGameState VisualizeGameState
 
 private function EventListenerReturn OnUpdateTimerEvent(Object EventData, Object EventSource, XComGameState GameState, Name EventID, Object CallbackData)
 {
-	if (!MissionHasEvacPlaced)
+	local XComGameState_RequestEvac CurrentState;
+
+	CurrentState = XComGameState_RequestEvac(`XCOMHISTORY.GetGameStateForObjectID(ObjectID));
+
+	if (CurrentState == none || CurrentState.bRemoved)
 	{
-		UpdateEvacTimer();
+		return ELR_NoInterrupt;
+	}
+
+	if (CurrentState.MissionHasEvacPlaced)
+	{
+		CurrentState.HideRemoveEvacCountdownTimer();
 	}
 	else
 	{
-		HideRemoveEvacCountdownTimer();
+		CurrentState.UpdateEvacTimer();
 	}
 
 	return ELR_NoInterrupt;
@@ -541,20 +586,6 @@ final function HideRemoveEvacCountdownTimer()
 	}
 
 	SpecialMissionHUD.m_kTurnCounter2.Hide();
-}
-
-final function DisableEvacTimer()
-{
-	local UISpecialMissionHUD SpecialMissionHUD;
-
-	SpecialMissionHUD = `PRES.GetSpecialMissionHUD();
-
-	if (SpecialMissionHUD == none)
-	{
-		return;
-	}
-
-	SpecialMissionHUD.m_kTurnCounter2.SetUIState(eUIState_Disabled);
 }
 
 // --------------------------------------------------------------------------------------------------------------
@@ -619,16 +650,13 @@ function TTile GetCenterTile()
 }
 
 // Copied from XComGameState_EvacZone::GetEvacZone but we need to avoid getting the evac zone placed from mission.
-function XComGameState_EvacZone GetRequestedEvacZone(optional ETeam InTeam = eTeam_XCom)
+static function XComGameState_EvacZone GetRequestedEvacZone(optional ETeam InTeam = eTeam_XCom)
 {
 	local XComGameState_EvacZone EvacState;
-	local XComGameStateHistory History;
 
-	History = `XCOMHISTORY;
-
-	foreach History.IterateByClassType(class'XComGameState_EvacZone', EvacState)
+	foreach `XCOMHISTORY.IterateByClassType(class'XComGameState_EvacZone', EvacState)
 	{
-		if (EvacState.Team == InTeam && !EvacState.bMissionPlaced)
+		if (EvacState.Team == InTeam && !EvacState.bMissionPlaced && !EvacState.bRemoved)
 		{
 			return EvacState;
 		}
@@ -637,25 +665,24 @@ function XComGameState_EvacZone GetRequestedEvacZone(optional ETeam InTeam = eTe
 	return none;
 }
 
-function bool MissionEvacExist(optional ETeam InTeam = eTeam_XCom)
+static function bool MissionEvacExists(optional ETeam InTeam = eTeam_XCom)
 {
 	local XComGameState_EvacZone EvacState;
-	local XComGameStateHistory History;
 
-	History = `XCOMHISTORY;
-
-	foreach History.IterateByClassType(class'XComGameState_EvacZone', EvacState)
+	foreach `XCOMHISTORY.IterateByClassType(class'XComGameState_EvacZone', EvacState)
 	{
-		if (EvacState.Team == InTeam && EvacState.bMissionPlaced)
+		if (EvacState.Team == InTeam && EvacState.bMissionPlaced && !EvacState.bRemoved)
 		{
-			MissionHasEvacPlaced = true;
-			return MissionHasEvacPlaced;
+			return true;
 		}
 	}
 
-	MissionHasEvacPlaced = false;
+	return false;
+}
 
-	return MissionHasEvacPlaced;
+function SetMissionHasEvacPlaced(bool bMissionHasEvacPlaced)
+{
+	MissionHasEvacPlaced = bMissionHasEvacPlaced;
 }
 
 // --------------------------------------------------------------------------------------------------------------
@@ -669,7 +696,6 @@ function SyncVisualizer(optional XComGameState GameState = none) {}
 function AppendAdditionalSyncActions( out VisualizationActionMetadata ActionMetadata, const XComGameStateContext Context)
 {
 	local X2Action_PlayEffect		PlayEffect;
-	local X2Action_RevealArea		RevealAreaAction;
 	local XComGameState_EvacZone	EvacZone;
 
 	if (ActionMetadata.StateObject_NewState.bRemoved)
@@ -681,26 +707,18 @@ function AppendAdditionalSyncActions( out VisualizationActionMetadata ActionMeta
 
 	if (GetCountdown() > 0)
 	{
-		PlayEffect = X2Action_PlayEffect(class'X2Action_PlayEffect'.static.AddToVisualizationTree(ActionMetadata, Context, false, ActionMetadata.LastActionAdded));
-
-		PlayEffect.EffectName = "BDRequestEvac.P_EvacZone_Flare";
-		PlayEffect.EffectLocation = GetLocation();
+		PlayEffect = AddFlareAction(ActionMetadata, Context, GetLocation(), false, ActionMetadata.LastActionAdded);
 		PlayEffect.CenterCameraOnEffectDuration = 0;
-		PlayEffect.bStopEffect = false;
 
 		`RELOG("Spawning flare on save load:" @ GetCountdown() @ GetLocation() @ ActionMetadata.StateObject_NewState.bRemoved @ ObjectID);
 	}
 	else if (GetRemoveEvacCountdown() > 0)
 	{
-		EvacZone = class'XComGameState_EvacZone'.static.GetEvacZone();
+		EvacZone = GetRequestedEvacZone();
 
 		if (EvacZone != none)
 		{
-			RevealAreaAction = X2Action_RevealArea(class'X2Action_RevealArea'.static.AddToVisualizationTree(ActionMetadata, Context, false, ActionMetadata.LastActionAdded));
-			RevealAreaAction.ScanningRadius = class'XComWorldData'.const.WORLD_StepSize * 5.0f;
-			RevealAreaAction.TargetLocation = GetLocation();
-			RevealAreaAction.bDestroyViewer = false;
-			RevealAreaAction.AssociatedObjectID = EvacZone.ObjectID;
+			AddRevealAreaAction(ActionMetadata, Context, GetLocation(), EvacZone.ObjectID, ActionMetadata.LastActionAdded);
 		}
 	}
 

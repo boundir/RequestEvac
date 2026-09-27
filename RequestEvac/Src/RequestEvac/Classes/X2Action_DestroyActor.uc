@@ -4,12 +4,12 @@ simulated state Executing
 {
 	begin:
 
-		`RELOG(GetFuncName() @ "destroying actor" @ Metadata.VisualizeActor != none);
-		
-		Metadata.VisualizeActor.Destroy();
+		`RELOG("Destroying actor:" @ Metadata.VisualizeActor != none);
 
-		// Stop the EvacZoneFlare environmental SFX (chopper blades/exhaust)
-		//WorldInfo.StopAkSound(WorldInfo.PlayAkSound("SoundEnvironment.EvacZoneFlares"));
+		if (Metadata.VisualizeActor != none)
+		{
+			Metadata.VisualizeActor.Destroy();
+		}
 
 		CompleteAction();
 }
